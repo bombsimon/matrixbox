@@ -870,7 +870,7 @@ def list_mode(mini=False, half=False):
                 _max_lw = 0
                 for _a in trainlist:
                     if isinstance(_a, list) and len(_a) > 1:
-                        _w = strlen(_a[1][:varinit.settings["line_length"]])
+                        _w = strlen(_a[1][:varinit.settings["line_length"]].lower())
                         if _w > _max_lw: _max_lw = _w
                 line_col = _max_lw + 6
             else:
@@ -904,7 +904,8 @@ def list_mode(mini=False, half=False):
                         all[2] = all[2][:-1]
                 elif large_list:
                     _max_px = varinit.if_long - strlen(all[3]) - line_col
-                    while len(all[2]) > 0 and strlen(all[2]) > max(0, _max_px):
+                    _font = fonts[varinit.currentfont]
+                    while len(all[2]) > 0 and sum(_font.get(c, _font['_'])[0] for c in all[2]) > max(0, _max_px):
                         all[2] = all[2][:-1]
                 elif not half: all[2] = all[2][:25]
                 if half: 
@@ -961,7 +962,7 @@ def list_mode(mini=False, half=False):
                     _dest_pad = line_col * "("
                     renderstring(multiple_offset + minsleft, _lpart, 0, 0, inv, sys_msg=min_color)
                     renderstring(multiple_offset + _dest_pad + dest, _lpart, 0, 0, inv)
-                    if not half and not varinit.rotated: renderstring(multiple_offset + line, _lpart, 0, 0, inv, sys_msg=lin_color)
+                    if not half and not varinit.rotated: renderstring(multiple_offset + line.lower(), _lpart, 0, 0, inv, sys_msg=lin_color)
                     if x > 4: continue
                 else:
                     renderstring(multiple_offset + minsleft, 100+x, 0, 0, inv, mini=mini, sys_msg=min_color)
