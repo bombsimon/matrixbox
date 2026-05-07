@@ -3,11 +3,13 @@ import digitalio, board
 def time_button():
     return 1 - button.value
 
-_btn_state = 0  # 0=IDLE, 1=WAIT_DEBOUNCE, 2=WAIT_LONG, 3=WAIT_RELEASE
+_btn_state = 0  # 0=IDLE, 1=WAIT_DEBOUNCE, 2=WAIT_LONG, 3=WAIT_RELEASE, 4=CONFIRM_RELEASE
 _btn_time = 0
+_release_time = 0
+_long_threshold = 0.8  # seconds held before counted as long press
 
 def check_if_button_pressed():
-    global _btn_state, _btn_time
+    global _btn_state, _btn_time, _release_time
     now = time.monotonic()
     pressed = time_button()
 
@@ -17,7 +19,7 @@ def check_if_button_pressed():
             _btn_state = 1
         return 0
 
-    if _btn_state == 1:
+    if _btn_state == 1:  # debounce press
         if now - _btn_time < debounce_delay:
             return 0
         if pressed:
@@ -27,18 +29,28 @@ def check_if_button_pressed():
             return 1
         return 0
 
-    if _btn_state == 2:
-        if now - _btn_time < debounce_delay * 3:
-            if not pressed:
-                _btn_state = 0
-                return 1
-            return 0
-        _btn_state = 3
-        return 2
+    if _btn_state == 2:  # waiting for long threshold
+        if now - _btn_time >= _long_threshold:
+            _btn_state = 3
+            return 2
+        if not pressed:
+            # don't immediately fire - debounce the release too
+            _release_time = now
+            _btn_state = 4
+        return 0
 
-    if _btn_state == 3:
+    if _btn_state == 3:  # wait for release after long press
         if not pressed:
             _btn_state = 0
+        return 0
+
+    if _btn_state == 4:  # confirm release (debounce)
+        if pressed:
+            _btn_state = 2  # bounce - still holding
+            return 0
+        if now - _release_time >= debounce_delay:
+            _btn_state = 0
+            return 1
         return 0
 
     return 0
