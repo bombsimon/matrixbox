@@ -128,6 +128,7 @@ PAGE_TPL = """<!DOCTYPE html>
 <tr><td><b>{T_LIST_COLORS}</b></td><td>{LISTCOLOR_CHK} {LISTCOLOR_TIME_CHK}</td></tr>
 <tr><td><b>{T_FONT_MINI}</b></td><td>{FONTMINI_CHK}</td></tr>
 <tr><td><b>Large list</b></td><td>{LARGE_LIST_CHK}</td></tr>
+<tr><td><b>XS line ID</b></td><td>{XS_LINE_ID_CHK}</td></tr>
 <tr><td><b>Timer</b></td><td><button type="button" onclick="location.href='/?timer=set'">&#8987;</button></td></tr>
 <tr><td></td><td>{INVERT_CHK}</td></tr>
 <tr><td><b>{T_ROTATION}</b></td><td><button type="button" data-u="/?rotate=1">&#128260; 90&deg;</button></td></tr>
@@ -431,6 +432,8 @@ def html():
 
     # large_list
     large_list_html = _chk("LARGE_LIST", s.get("large_list", 0), "/?large_list=switch", "font_large list (64px)")
+    # xs_line_id
+    xs_line_id_html = _chk("XS_LINE_ID", s.get("xs_line_id", 0), "/?xs_line_id=switch", "line ID on 64px-wide")
 
     # invert
     invert_html = _chk("INVERT", s["invert"], "/?invert=switch", T["invert"])
@@ -509,6 +512,7 @@ def html():
         "T_FONT_MINI": T["font_mini"],
         "FONTMINI_CHK": fontmini_html,
         "LARGE_LIST_CHK": large_list_html,
+        "XS_LINE_ID_CHK": xs_line_id_html,
         "INVERT_CHK": invert_html, "DNS_SECTION": dns_html,
         "T_ROTATION": T.get("rotation", "Rotation"),
         "RT_INDICATOR_CHK": rt_indicator_html,
