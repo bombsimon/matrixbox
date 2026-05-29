@@ -17,6 +17,16 @@
 <div class="seg">
 <button id="m_scroll" onclick="sm('scroll')">Scroll</button>
 <button id="m_list" onclick="sm('list')">List</button>
+<button id="m_graph" onclick="sm('graph')">Graph</button>
+</div>
+</div>
+
+<div class="card" id="graph_opts" style="display:none">
+<div class="section-title">Graph Range</div>
+<div class="seg">
+<button id="gr_1d" onclick="sgr('1d')">Today</button>
+<button id="gr_5d" onclick="sgr('5d')">5 Days</button>
+<button id="gr_1mo" onclick="sgr('1mo')">1 Month</button>
 </div>
 </div>
 
@@ -64,7 +74,8 @@ function ss(){var v=document.getElementById("sym").value.replace(/\s/g,"");if(v)
 function sp(n){p("speed="+n);document.querySelectorAll(".seg button[id^=s]").forEach(function(b){b.classList.toggle("on",b.id==="s"+n)})}
 function si(n){p("interval="+n)}
 function sf(f){p("font="+f);document.querySelectorAll("[id^=f_]").forEach(function(b){b.classList.toggle("on",b.id==="f_"+f)})}
-function sm(m){p("mode="+m);document.querySelectorAll("[id^=m_]").forEach(function(b){b.classList.toggle("on",b.id==="m_"+m)})}
+function sm(m){p("mode="+m);document.querySelectorAll("[id^=m_]").forEach(function(b){b.classList.toggle("on",b.id==="m_"+m)});document.getElementById("graph_opts").style.display=m==="graph"?"":"none"}
+function sgr(r){p("graph_range="+r);document.querySelectorAll("[id^=gr_]").forEach(function(b){b.classList.toggle("on",b.id==="gr_"+r)})}
 function sv(){p("save=1")}
 function lq(){
 fetch("/quotes").then(function(r){return r.json()}).then(function(d){
@@ -83,6 +94,8 @@ document.getElementById("sym").value=d.symbols||"";
 var f=d.font||"small";document.querySelectorAll("[id^=f_]").forEach(function(b){b.classList.toggle("on",b.id==="f_"+f)});
 var s=d.speed||2;document.querySelectorAll(".seg button[id^=s]").forEach(function(b){b.classList.toggle("on",b.id==="s"+s)});
 var m=d.mode||"scroll";document.querySelectorAll("[id^=m_]").forEach(function(b){b.classList.toggle("on",b.id==="m_"+m)});
+document.getElementById("graph_opts").style.display=m==="graph"?"":"none";
+var gr=d.graph_range||"1d";document.querySelectorAll("[id^=gr_]").forEach(function(b){b.classList.toggle("on",b.id==="gr_"+gr)});
 }).catch(function(){});}
 ls();lq();setInterval(lq,15000);
 </script>
