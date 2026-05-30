@@ -526,6 +526,9 @@ def get_departure(num = "1", dataout = [["1", "^ Data error","","",""]]):
     except Exception as e: 
         print(e)
         cls(topbottom)
+        try:
+            if not data["departures"] and "msg" in data: return [["1", data["msg"], "***","",""]]
+        except: pass
         return [["1", dicts.language[varinit.settings["language"]]["settings"]["no_data"],"***","",""]]
     return dataout
 
