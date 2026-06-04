@@ -7,6 +7,7 @@ _btn_state = 0  # 0=IDLE, 1=WAIT_DEBOUNCE, 2=WAIT_LONG, 3=WAIT_RELEASE, 4=CONFIR
 _btn_time = 0
 _release_time = 0
 _long_threshold = 0.8  # seconds held before counted as long press
+_noise_threshold = 0.03  # presses shorter than this are treated as noise
 
 def check_if_button_pressed():
     global _btn_state, _btn_time, _release_time
@@ -19,14 +20,13 @@ def check_if_button_pressed():
             _btn_state = 1
         return 0
 
-    if _btn_state == 1:  # debounce press
-        if now - _btn_time < debounce_delay:
+    if _btn_state == 1:  # noise filter on press
+        if now - _btn_time < _noise_threshold:
+            return 0  # too short — wait
+        if not pressed:
+            _btn_state = 0  # gone within noise window — discard
             return 0
-        if pressed:
-            _btn_state = 2
-        else:
-            _btn_state = 0
-            return 1
+        _btn_state = 2  # held long enough to be real — proceed
         return 0
 
     if _btn_state == 2:  # waiting for long threshold
