@@ -213,7 +213,8 @@ def manual_dns():
 def wifiattempt(errmsg=True, _timeout=None, skipversion=False):
     _timeout = 5
     if "no_dhcp" in os.listdir(): manual_dns()
-    if varinit.settings["ssid"] == "my_ssid": return
+    #if varinit.settings["ssid"] == "my_ssid": return
+    if wifi.radio.connected == True: return
     try:
         wifi.radio.enabled = True
         wifi.radio.connect(ssid=varinit.settings["ssid"], password=varinit.settings["password"].replace("%23","#"), timeout=_timeout)
