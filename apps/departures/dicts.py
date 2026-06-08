@@ -472,7 +472,7 @@ language = {"se":{"settings":{"connected":"Ansluten",
                               "rt_indicator":"Real-time indicator",
                               "power":"WiFi TX power (7-20)",
                               "show_lines":"Show lines (comma sep.)",
-                              "line_length":"Line length (0-6)",
+                              "line_length":"Line length (0-8)",
                               "no_more_departures_label":"No departures message",
                               "mins_label":"Minutes abbreviation",
 
