@@ -4,7 +4,9 @@ You have two main ways to access the device: via /repl or via serial port (ask t
 == DEVICE ==
 ESP32-S3, CircuitPython 9, RGB LED matrix (width/height from settings).
 Filesystem: / (flash, ~1-4MB). Settings: /settings.txt (JSON dict).
+Repository: All original files live here: https://github.com/MatrixBOX-dev/matrixbox
 IMPORTANT: No subprocess, no pip, no shell. Only CircuitPython stdlib + bundled libs.
+
 
 == REMOTE ACCESS ==
 POST /repl — Hidden endpoint for remote code execution when USB disk is unavailable.
