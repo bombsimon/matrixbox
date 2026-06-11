@@ -69,7 +69,7 @@ PAGE_TPL = """<!DOCTYPE html>
 <div style="text-align:right;margin-top:.4rem">
 <button type="button" class="btn btn-outline-secondary btn-sm" id="searchbtn" onclick="doSearch()" {SEARCH_DIS}>{T_SEARCH}</button>
 </div>
-<select id="newstation" class="form-control" name="newstation" data-p="newstation" data-e="change" style="margin-top:.4rem" {RESULT_DIS} {RESULT_STYLE}>{RESULTS}</select>
+<select id="newstation" class="form-control" name="newstation" data-p="newstation" data-e="change" style="margin-top:.4rem" {RESULT_DIS} {RESULT_STYLE} onchange="this.style.animation=''">{RESULTS}</select>
 </div></div></div>
 <div class="card">
 <div class="grp"><div class="grp-title">&#9881; {T_BRIGHTNESS} / {SCROLL_LABEL}</div>
@@ -473,8 +473,8 @@ def html():
         "SCREEN_BUTTONS": screen_btns, "SCREEN_BTN_DISP": screen_btn_disp,
         "STATION_PH": station_ph, "SEARCH_DIS": search_dis,
         "T_SEARCH": T["_search"],
-        "OPBTN_PULSE": 'style="animation:guide-pulse 2.5s ease-in-out infinite"' if not co else "",
-        "SSTRING_PULSE": 'style="animation:guide-pulse 2.5s ease-in-out infinite"' if (co and connected and not stn["mystation"]) else "",
+        "OPBTN_PULSE": 'style="animation:guide-pulse 2.5s ease-in-out infinite"' if (not co or not stn["operator"]) else "",
+        "SSTRING_PULSE": 'style="animation:guide-pulse 2.5s ease-in-out infinite"' if (co and stn["operator"] and connected and not stn["mystation"]) else "",
         "RESULTS": varinit.results, "RESULT_DIS": result_dis,
         "RESULT_STYLE": result_style,
         "T_NO_DEPARTURES": T["no_departures"],
