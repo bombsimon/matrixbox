@@ -65,6 +65,13 @@ def _free_space():
     s = os.statvfs("/")
     return s[0] * s[3]  # block size * free blocks
 
+def _run_button_html(app):
+    return """<button class="btn btn-sm" onclick="run"""+app+"""()">&#9654; Run</button>
+<script>function run"""+app+"""() {
+    fetch("/?run="""+app+"""", { method: "GET" }).then(() => {
+        setTimeout(() => { window.location.href = "/"; }, 10);
+    });}</script>"""
+
 def textbox(settings):
     slider_cfg = {
         "wifi_power": {"min": 7, "max": 20, "step": 1},
@@ -365,7 +372,7 @@ def list_available_apps(apps):
                 upd_btn = '<button class="btn btn-sm" style="background:linear-gradient(135deg,#00c85d,#00e676);color:#000;border:2px solid #f0c800" onclick="install'+dir+'(event)">&#x21BB; Update</button>'
             else:
                 upd_btn = '<button class="btn btn-sm btn-warning" onclick="install'+dir+'(event)">&#x21BB; Reinstall</button>'
-            applist += f'<div class="download-item"><div><span class="download-name">&#x2713; {dir}</span><div style="font-size:.7rem;color:#f0c800;margin-top:2px">{ver_info}</div></div><div style="display:flex;gap:6px">' + upd_btn + """<button class="btn btn-sm" style="background:#ff4b4b;color:#fff;padding:7px 9px" onclick="if(confirm('Delete """+dir+"""?'))del"""+dir+"""(event)">&#x2715;</button>
+            applist += f'<div class="download-item"><div><span class="download-name">&#x2713; {dir}</span><div style="font-size:.7rem;color:#f0c800;margin-top:2px">{ver_info}</div></div><div style="display:flex;gap:6px">' + _run_button_html(dir) + upd_btn + """<button class="btn btn-sm" style="background:#ff4b4b;color:#fff;padding:7px 9px" onclick="if(confirm('Delete """+dir+"""?'))del"""+dir+"""(event)">&#x2715;</button>
 <script>function install"""+dir+"""(e){_busyWait("/?install="""+dir+"""",e.currentTarget)}
 function del"""+dir+"""(e){_busyWait("/?delete="""+dir+"""",e.currentTarget)}</script></div></div>"""
         else:
@@ -610,11 +617,7 @@ def _apps_content():
             except: continue
             ver = _app_ver(app)
             ver_html = f'<div style="font-size:.7rem;color:var(--muted);margin-top:2px">v{ver}</div>' if ver else ''
-            installed_apps += f'<div class="app-item"><div><span class="app-name">{app}</span>{ver_html}</div>' + """<button class="btn btn-sm" onclick="run"""+app+"""()">&#9654; Run</button>
-<script>function run"""+app+"""() {
-    fetch("/?run="""+app+"""", { method: "GET" }).then(() => {
-        setTimeout(() => { window.location.href = "/"; }, 10);
-    });}</script></div>"""
+            installed_apps += f'<div class="app-item"><div><span class="app-name">{app}</span>{ver_html}</div>' + _run_button_html(app) + """</div>"""
     if not installed_apps:
         installed_apps = '<p style="color:var(--muted);text-align:center;padding:16px 0 8px;font-size:.9rem">No apps installed yet</p><div style="text-align:center;padding-bottom:8px"><button class="btn btn-sm btn-success" onclick="nav(\'/f/download\')">&#x2B07; Visit the Store</button></div>'
     preset_html = '<div class="card" style="margin-top:10px"><div class="section-title">Screen Size</div><div class="action-row">' + _preset_buttons() + '</div></div>' if _showed_wifi else ''
