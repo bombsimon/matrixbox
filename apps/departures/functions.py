@@ -712,7 +712,7 @@ def scroll_mode():
         
         renderstring(_logo, 1, 0, 1, large=True, block=True, logo=True)
         wifiattempt()
-        check_version()
+        #check_version()
         varinit.first_start = False
         if varinit.settings["long"] == -1:
             varinit.settings["listmode"] = 1
