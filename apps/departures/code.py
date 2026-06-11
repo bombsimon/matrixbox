@@ -27,6 +27,17 @@ disp_init()
 if varinit.display.width <= 64 or varinit.display.height > 32:
     varinit.settings["listmode"] = 1
 scroll_mode()
+#################################
+try:
+    if wifi.radio.connected == True:
+        with open("/settings.txt") as f:
+            data = json.loads(f.read())
+            for line in data:
+                if line == "ssid": varinit.settings["ssid"] = data["ssid"]
+                if line == "password": varinit.settings["password"] = data["password"]
+except Exception as e:
+    print("Error loading underlying WIFI settings:", e)
+#################################
 while not varinit.exit:
     while wifi.radio.connected == False and not varinit.exit:           # CHECK CONNECTION ###################
         try: wifi.radio.stop_ap()
