@@ -78,7 +78,11 @@ def connect_to_network(timeout=False, silent=False):
         pprint(str(wifi.radio.ipv4_address))
         savesettings(settings)
     except Exception as e: 
-        if not silent: pprint(str(e))
+        if not silent: 
+            if "unknown failure" in str(e).lower():
+                print(e)
+                e = "Router distance!"
+            pprint(str(e))
         wifi_status = str(e)
         print(e)
     return time.monotonic()
