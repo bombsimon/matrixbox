@@ -40,7 +40,7 @@ def _chk(name, val, url, label):
 PAGE_TPL = """<!DOCTYPE html>
 <html><head><meta name="viewport" content="width=device-width,initial-scale=1" charset="UTF-8">
 <link href="data:image/jpeg;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsQAAA7EAZUrDhsAAAA/SURBVDhPY2RgYPgPxGQDsAFAAOGRCBgZGREGgDikAJgeJiifbDDwBuAMRPQwwaVmGITBqAHUykwQLjmAgQEA3oYYFR16cP8AAAAASUVORK5CYII=" rel="icon" type="image/x-icon"/>
-<title>{TITLE}</title><style>{CSS}</style></head><body>
+<title>{TITLE}</title><style>{CSS}@keyframes guide-pulse{0%,100%{box-shadow:0 0 0 0 rgba(220,220,255,0)}60%{box-shadow:0 0 0 5px rgba(200,200,255,.3)}}</style></head><body>
 <div class="container">
 <div style="text-align:right"><a href="/exit" style="color:#ff4444;text-decoration:none;font-size:20px">&#x274C;</a></div>
 <div class="card" style="text-align:center">
@@ -60,12 +60,12 @@ PAGE_TPL = """<!DOCTYPE html>
 <div class="card">
 <div class="form-row" style="margin-bottom:.5rem"><div class="col" style="flex:0 0 auto">
 <div style="display:flex;align-items:center;gap:.4rem">
-<div class="dropdown"><button type="button" class="dropbtn" id="opbtn">{COUNTRY_FLAG} {OPERATOR} &#9660;</button>
+<div class="dropdown"><button type="button" class="dropbtn" id="opbtn" {OPBTN_PULSE}>{COUNTRY_FLAG} {OPERATOR} &#9660;</button>
 <div class="dropdown-content">{COMBINED_LIST}</div></div>
 <div id="screenbtns" style="{SCREEN_BTN_DISP}">{SCREEN_BUTTONS}</div>
 </div>
 </div><div class="col">
-<input type="text" id="sstring" class="form-control" name="sstring" placeholder="{STATION_PH}" {SEARCH_DIS} onkeydown="if(event.key==='Enter'){event.preventDefault();doSearch()}">
+<input type="text" id="sstring" class="form-control" name="sstring" placeholder="{STATION_PH}" {SEARCH_DIS} {SSTRING_PULSE} onkeydown="if(event.key==='Enter'){event.preventDefault();doSearch()}">
 <div style="text-align:right;margin-top:.4rem">
 <button type="button" class="btn btn-outline-secondary btn-sm" id="searchbtn" onclick="doSearch()" {SEARCH_DIS}>{T_SEARCH}</button>
 </div>
@@ -147,8 +147,8 @@ PAGE_TPL = """<!DOCTYPE html>
 var OPS=JSON.parse(document.getElementById('opsdata').textContent);var STN=JSON.parse(document.getElementById('stndata').textContent);
 function pickScr(n){fetch('/?screen='+n);var d=STN[n];if(!d)return;document.querySelectorAll('.scr-btn').forEach(function(b){b.classList.toggle('act',b.textContent==String(n));});var co=d.co,op=d.op.toLowerCase();var el=document.querySelector('.dd-grid img[data-c="'+co+'"]');var f=el?el.outerHTML.replace(/dd-sel/g,'')+' ':'';var nm=d.op.toUpperCase();var ops=OPS[co]||[];for(var i=0;i<ops.length;i++){if(ops[i][0]===op){nm=ops[i][1];break;}}document.getElementById('opbtn').innerHTML=f+nm+' &#9660;';document.getElementById('sstring').placeholder=d.ms||'';var cb={METRO:d.M,BUS:d.B,TRAIN:d.T,TRAM:d.R,SHIP:d.S,r:d.r,g:d.g,b:d.b};for(var k in cb){var e=document.getElementById(k);if(e)e.checked=!!cb[k];}var isSL=op==='sl';var sc=document.getElementById('slcolors');if(sc)sc.style.display=isSL?'':'none';var sb=document.getElementById('slbusopts');if(sb)sb.style.display=isSL?'':'none';var ab=document.getElementById('all_buses2');if(ab)ab.checked=!d.bo;var nb=document.getElementById('night_buses2');if(nb)nb.checked=!!d.bo;var of2=document.getElementById('offset');if(of2)of2.value=d.of;var di=document.getElementById('direction');if(di)di.value=d.di;}
 function pickC(c){var d=document.getElementById('ddops');d.innerHTML='';var ops=OPS[c]||[];for(var i=0;i<ops.length;i++){var a=document.createElement('a');a.href='#';a.textContent=ops[i][1];(function(cc,code,name){a.onclick=function(e){e.preventDefault();chCO(cc,code,name);return false;};})(c,ops[i][0],ops[i][1]);d.appendChild(a);}document.querySelectorAll('.dd-grid img').forEach(function(im){im.classList.toggle('dd-sel',im.dataset.c===c);});}
-function chCO(c,o,n){fetch('/?country='+c+'&operator='+o);var el=document.querySelector('.dd-grid img[data-c="'+c+'"]');var f='';if(el)f=el.outerHTML.replace(/dd-sel/g,'')+' ';document.getElementById('opbtn').innerHTML=f+n+' &#9660;';var sc=document.getElementById('slcolors');if(sc)sc.style.display=o==='sl'?'':'none';var sb=document.getElementById('slbusopts');if(sb)sb.style.display=o==='sl'?'':'none';}
-function doSearch(){var s=document.getElementById('sstring').value;if(!s)return;var b=document.getElementById('searchbtn');b.disabled=true;b.innerHTML='<span class="spin"></span>';fetch('/search?sstring='+encodeURIComponent(s)).then(function(r){return r.text();}).then(function(h){var sel=document.getElementById('newstation');sel.innerHTML=h;sel.disabled=false;sel.style.background='#2a1215';sel.style.borderColor='#dc3545';b.disabled=false;b.textContent='{T_SEARCH}';}).catch(function(){b.disabled=false;b.textContent='{T_SEARCH}';});}
+function chCO(c,o,n){fetch('/?country='+c+'&operator='+o);var el=document.querySelector('.dd-grid img[data-c="'+c+'"');var f='';if(el)f=el.outerHTML.replace(/dd-sel/g,'')+' ';document.getElementById('opbtn').innerHTML=f+n+' &#9660;';document.getElementById('opbtn').style.animation='';document.getElementById('sstring').style.animation='guide-pulse 2.5s ease-in-out infinite';var sc=document.getElementById('slcolors');if(sc)sc.style.display=o==='sl'?'':'none';var sb=document.getElementById('slbusopts');if(sb)sb.style.display=o==='sl'?'':'none';}
+function doSearch(){var s=document.getElementById('sstring').value;if(!s)return;var b=document.getElementById('searchbtn');b.disabled=true;b.innerHTML='<span class="spin"></span>';fetch('/search?sstring='+encodeURIComponent(s)).then(function(r){return r.text();}).then(function(h){var sel=document.getElementById('newstation');sel.innerHTML=h;sel.disabled=false;sel.style.background='#2a1215';sel.style.borderColor='#dc3545';sel.style.animation='guide-pulse 2.5s ease-in-out infinite';document.getElementById('sstring').style.animation='';b.disabled=false;b.textContent='{T_SEARCH}';}).catch(function(){b.disabled=false;b.textContent='{T_SEARCH}';});}
 function doScan(){fetch('/checknet').then(function(r){return r.text();}).then(function(h){var sel=document.getElementById('ssid');sel.innerHTML=h;sel.disabled=false;document.getElementById('password').disabled=false;document.getElementById('connect_wifi').disabled=false;}).catch(function(){});}
 
 var mc=document.getElementById('multiple');if(mc)mc.addEventListener('change',function(){var sb=document.getElementById('screenbtns');if(sb)sb.style.display=mc.checked?'':'none';});
@@ -294,7 +294,7 @@ def html():
     result_style = ""
     if varinit.results:
         result_dis = ""
-        result_style = "style='background:#2a1215;border-color:#dc3545'"
+        result_style = "style='background:#2a1215;border-color:#dc3545;animation:guide-pulse 2.5s ease-in-out infinite'"
 
     # maxdest options
     _p = []
@@ -473,6 +473,8 @@ def html():
         "SCREEN_BUTTONS": screen_btns, "SCREEN_BTN_DISP": screen_btn_disp,
         "STATION_PH": station_ph, "SEARCH_DIS": search_dis,
         "T_SEARCH": T["_search"],
+        "OPBTN_PULSE": 'style="animation:guide-pulse 2.5s ease-in-out infinite"' if not co else "",
+        "SSTRING_PULSE": 'style="animation:guide-pulse 2.5s ease-in-out infinite"' if (co and connected and not stn["mystation"]) else "",
         "RESULTS": varinit.results, "RESULT_DIS": result_dis,
         "RESULT_STYLE": result_style,
         "T_NO_DEPARTURES": T["no_departures"],
