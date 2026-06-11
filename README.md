@@ -1,4 +1,4 @@
-# MatrixBox - v.0.9b
+# MatrixBox
 
 ## WIRELESS SETUP:
 1. Connect to WIFI shown on screen
