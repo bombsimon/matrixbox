@@ -616,7 +616,7 @@ def _apps_content():
         setTimeout(() => { window.location.href = "/"; }, 10);
     });}</script></div>"""
     if not installed_apps:
-        installed_apps = '<p style="color:var(--muted);text-align:center;padding:20px 0;font-size:.9rem">No apps installed yet</p>'
+        installed_apps = '<p style="color:var(--muted);text-align:center;padding:16px 0 8px;font-size:.9rem">No apps installed yet</p><div style="text-align:center;padding-bottom:8px"><button class="btn btn-sm btn-success" onclick="nav(\'/f/download\')">&#x2B07; Visit the Store</button></div>'
     preset_html = '<div class="card" style="margin-top:10px"><div class="section-title">Screen Size</div><div class="action-row">' + _preset_buttons() + '</div></div>' if _showed_wifi else ''
     return wifi_html + preset_html + """<div class="logo">
     <h1><span style="color:#fff">Matrix</span><span style="color:#f0c800;font-weight:900">BOX</span></h1>
