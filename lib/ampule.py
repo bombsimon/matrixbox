@@ -50,8 +50,9 @@ def __read_request(client):
     message = bytearray()
     hdr_end = -1
     content_length = 0
+    last_data = time.monotonic()
 
-    for _ in range(30):
+    while time.monotonic() - last_data < 2.0:
         try:
             num_received = client.recv_into(_recv_buffer)
             if num_received == 0:
@@ -62,6 +63,7 @@ def __read_request(client):
                     break
             if num_received > 0:
                 message.extend(_recv_buffer[:num_received])
+                last_data = time.monotonic()
             if hdr_end < 0:
                 hdr_end = message.find(b'\r\n\r\n')
                 if hdr_end >= 0:
