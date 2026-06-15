@@ -199,8 +199,12 @@ function renderPath(){
  }
  el.innerHTML=html;
 }
-function go(path){
+function enc(p){return p.split("/").map(encodeURIComponent).join("/");}
+function go(path){location.hash=enc(path||"/");}
+function doList(path){
  cwd=path||"/";
+ document.getElementById("editor").style.display="none";
+ document.getElementById("listing").style.display="block";
  renderPath();
  api("/fm/ls",cwd).then(function(d){
   if(d.error){alert(d.error);return}
@@ -231,7 +235,9 @@ function sel(row){
  if(prev)prev.classList.remove("selected");
  row.classList.add("selected");
 }
-function edit(fp){
+function edit(fp){location.hash="f:"+enc(fp);}
+function openEditor(fp){
+ cwd=fp.substring(0,fp.lastIndexOf("/"))||"/";
  api("/fm/read",fp).then(function(d){
   if(d.error){alert(d.error);return}
   document.getElementById("listing").style.display="none";
@@ -250,16 +256,13 @@ function saveFile(){
   else{btn.textContent="\\u2705 Saved";setTimeout(function(){btn.innerHTML="&#x1F4BE; Save"},1500);}
  });
 }
-function closeEditor(){
- document.getElementById("editor").style.display="none";
- document.getElementById("listing").style.display="block";
-}
+function closeEditor(){go(cwd);}
 function del(fp){
  var name=fp.split("/").pop();
  if(!confirm("Delete "+name+"?"))return;
  api("/fm/del",fp).then(function(d){
   if(d.error)alert(d.error);
-  else go(cwd);
+  else doList(cwd);
  });
 }
 function showModal(title,cb){
@@ -281,7 +284,7 @@ function newFile(){
   var fp=cwd.replace(/\\/$/,"")+"/"+name;
   api("/fm/write",fp,"").then(function(d){
    if(d.error)alert(d.error);
-   else{go(cwd);edit(fp);}
+   else{edit(fp);}
   });
  });
 }
@@ -290,7 +293,7 @@ function newDir(){
   var fp=cwd.replace(/\\/$/,"")+"/"+name;
   api("/fm/mkdir",fp).then(function(d){
    if(d.error)alert(d.error);
-   else go(cwd);
+   else doList(cwd);
   });
  });
 }
@@ -300,6 +303,12 @@ document.addEventListener("keydown",function(e){
   if(document.getElementById("editor").style.display==="flex")saveFile();
  }
 });
-go("/");
+function router(){
+ var h=decodeURIComponent(location.hash.slice(1));
+ if(h.slice(0,2)==="f:")openEditor(h.slice(2));
+ else doList(h||"/");
+}
+window.addEventListener("hashchange",router);
+if(location.hash.length>1)router();else go("/");
 </script>
 </body></html>""")
