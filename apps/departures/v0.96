@@ -1,2 +1,3 @@
-v0.96 - loading WIFI from underlying interface
-changed button order + added blinking UI
+{"description":"Live public transport departures around Europe (previously known as T-Skylt",
+"v0.96" : ["loading WIFI from underlying interface","changed button order + added blinking UI"],
+"icon":0}
