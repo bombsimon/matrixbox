@@ -917,7 +917,7 @@ def list_mode(mini=False, half=False):
                         all[2] = all[2][:-1]
                 elif not half:
                     _line_col_w = strlen(varinit.settings["line_length"] * ("((((" if mini else "(((((("))
-                    _max_px = varinit.if_long - strlen(all[3]) - _line_col_w
+                    _max_px = varinit.if_long - strlen(all[3]) - _line_col_w - 2
                     while len(all[2]) > 0 and strlen(all[2]) > max(0, _max_px):
                         all[2] = all[2][:-1]
                 if half: 
