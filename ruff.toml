@@ -1,0 +1,17 @@
+# This runs on CircuitPython, not CPython: no `typing` module, and no
+# guarantee of PEP 604 (`X | None`) or PEP 585 (`list[int]`) support. Target
+# an older version so ruff doesn't suggest syntax the device can't run.
+target-version = "py38"
+extend-exclude = ["lib", "matrixbox/fonts/mini.py", "matrixbox/fonts/small.py", "matrixbox/fonts/large.py", "lib.bak"]
+
+[lint]
+ignore = [
+    "BLE001", # hardware/network failure modes aren't a small fixed set of exceptions
+    "RUF013", # implicit Optional is intentional — no `typing` import, no `X | None` at runtime
+    "RUF012", # `typing.ClassVar` is unavailable; these class dicts are copied (never mutated) on use
+]
+
+[lint.per-file-ignores]
+# tools/ runs on a developer's machine with regular CPython, not the device —
+# modern syntax is fine there.
+"tools/*.py" = ["FA102", "UP006", "UP007", "UP045"]

@@ -2,6 +2,20 @@
 
 Tools used for development and iteration of the software and applications.
 
+## Syncing over USB
+
+With the device plugged in and unlocked (see README.md "Offline setup"), it
+mounts as a USB drive. `tools/sync.sh` mirrors this repo onto it with
+`rsync --delete` — the device ends up exactly matching `matrixbox/`,
+`main.py`, `boot.py`, `safemode.py`, the version marker, `lib/`, and
+`apps/`; anything else under those paths (including apps not yet migrated
+to the `App` base class — see README.md "What's deferred") gets removed.
+
+```sh
+tools/sync.sh                     # defaults to /Volumes/CIRCUITPY
+tools/sync.sh /Volumes/OTHERNAME  # or point at a different mount
+```
+
 ## Pushing files to device
 
 The device doesn't have any SSH or FTP server, however the HTTP server that

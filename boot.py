@@ -1,53 +1,64 @@
-import sys, wifi, socketpool, ampule, time, os, json, microcontroller, storage
-import load_settings
-import digitalio, board
-settings =  load_settings.settings()
+import os
+import time
+
+import storage
+import supervisor
+
+supervisor.runtime.autoreload = False  # see docs/architecture.md
+
+from matrixbox.button import button
+from matrixbox.display import display
+from matrixbox.fonts import MINI
+from matrixbox.layout import Align, TextGrid
+
+_grid = TextGrid(display.canvas, font=MINI)
 
 
-from load_screen import *
-import check_button
-from check_button import *
-# from check_button import check_if_button_pressed
+def _splash(text, color=4):
+    display.canvas.fill(0)
+    _grid.line(text, 0, color=color, align=Align.LEFT, clear=False)
+    display.refresh()
 
-def boot_splash():
-    pprint("Booting...", line=0, color="red")
 
-def check_if_button_pressed_on_boot():
-    try:
-        return time_button()
-    except Exception as e:
-        print(e)
-        return 1
-
-def lock():
+def _lock_filesystem():
     storage.disable_usb_drive()
     storage.remount("/", False)
-        
-boot_splash()
 
 
-if "unlock" in os.listdir():
-    lock()
-    try: os.remove("unlock")
-    except: pass
+def _button_held_on_boot() -> bool:
+    try:
+        return button.pressed
+    except Exception:
+        return True  # can't read the button — fail toward unlocked
+
+
+_splash("Booting...")
+
+if "unlock" in os.listdir("/"):
+    _lock_filesystem()
+    try:
+        os.remove("/unlock")
+    except OSError:
+        pass
+
     storage.enable_usb_drive()
-    pprint("Unlocking filesystem")
-
-elif check_if_button_pressed_on_boot():
-    pprint("Unlocking filesystem")
+    _splash("Unlocking filesystem")
+elif "dev_mode" in os.listdir("/"):
+    # disable_concurrent_write_protection: see docs/architecture.md.
+    storage.remount("/", readonly=False, disable_concurrent_write_protection=True)
+    _splash("Dev mode: unlocked")
+elif _button_held_on_boot():
+    _splash("Unlocking filesystem")
 else:
-    lock()
-    pprint("Hold to unlock")
-    #pprint("Locked filesystem")
+    _lock_filesystem()
+    _splash("Hold to unlock")
     time.sleep(1)
 
-try: os.remove("code.py")
-except: pass
-try: os.remove("reboot_required")
-except: pass
+for stale_file in ("/code.py", "/reboot_required"):
+    try:
+        os.remove(stale_file)
+    except OSError:
+        pass
 
-
-try: clearscreen(True)
-except Exception as e: pprint(str(e))
-
-    
+display.canvas.fill(0)
+display.refresh()

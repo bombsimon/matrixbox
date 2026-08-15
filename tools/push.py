@@ -1,18 +1,5 @@
 #!/usr/bin/env python3
-"""Push a local file to a running MatrixBox over Wi-Fi — "scp for the device".
-
-Text files go through the file manager (/fm/write). Binary files (e.g. .mpy)
-go through /repl + base64, because the device's HTTP transport is text-only and
-truncates at the first null byte. Format is auto-detected (override with
---binary / --text).
-
-Both routes are only live from the device's SELECTOR screen — a running app
-clears them, so exit any app first.
-
-Usage:
-    python3 tools/push.py <local> <device_path> [--host IP]
-    MATRIXBOX_HOST=192.168.1.10 python3 tools/push.py apps/my_app/code.mpy /my_app/code.mpy
-"""
+# "scp for the device" — see tools/README.md for usage.
 
 import argparse
 import base64
@@ -41,7 +28,6 @@ def post(url: str, body: bytes, headers: dict | None = None) -> str:
 
 
 def repl(host: str, snippet: str) -> str:
-    """Run a Python snippet on the device via /repl, return its printed output."""
     out = post(f"http://{host}/repl", base64.b64encode(snippet.encode()))
     res = json.loads(out)
     msg = base64.b64decode(res.get("output", "")).decode("utf-8", "replace").strip()

@@ -1,246 +1,525 @@
+import gc
+import json
+import os
+import sys
+import time
 
-import sys, wifi, socketpool, time, os, json, microcontroller, ampule, gc
-import load_settings
-import digitalio, board
-import adafruit_connection_manager, adafruit_requests
-settings =  load_settings.settings()
-from load_screen import *
-from check_button import *
+import microcontroller
+import wifi
 
-if "apps" in os.listdir():
-    for file in os.listdir("apps"):
-        try: os.rename("apps/" + file, file)
-        except: pass
-    try: os.rmdir("apps")
-    except: pass
+from matrixbox import components, updater
+from matrixbox.app import session
+from matrixbox.button import LONG_PRESS, SHORT_PRESS, button
+from matrixbox.display import display
+from matrixbox.fonts import MINI
+from matrixbox.layout import Align, TextGrid
+from matrixbox.net import server_socket, wifi_manager
+from matrixbox.scroll import Scroller
+from matrixbox.settings import settings
+from matrixbox.theme import FAVICON_SVG
+from matrixbox.web import router, url_decode
 
-def show_logo():
-    pprint("MatrixBOX(", line=0, color="yellow", hr="¨", _refresh=False, overlay=True)
-    #pprint("", line=0, color="brightwhite", overlay=True)
-    pprint("Matrix", line=0, color="brightwhite", overlay=True)
+APPS_DIR = "/apps"
 
-_anim_x = display.width+1
-def logo_anim_step():
-    global _anim_x
-    W = display.width
-    if _anim_x >= W:
-        #_anim_x = 0
-        return
-    x = _anim_x
-    saved = []
-    for y in (2, 4):
-        old = window[x, y]
-        saved.append(old)
-        if old == 7:
-            window[x, y] = 9
-        elif old == 5:
-            window[x, y] = 2
-        elif old == 2:
-            window[x, y] = 5
-        elif old == 1:
-            window[x, y] = 2
-    refresh()
-    for i, y in enumerate((2, 4)):
-        window[x, y] = saved[i]
-    _anim_x += 1
-    if _anim_x >= W:
-        refresh()
 
-show_logo()
-
-wifi.radio.tx_power = 9.0
-pool = socketpool.SocketPool(wifi.radio)
-socket = pool.socket()
-socket.setblocking(False)
-socket.setsockopt(pool.SOL_SOCKET, pool.SO_REUSEADDR, 1)
-socket.bind(('', 80))
-socket.listen(5)
-socket_timeout = 5
-macid = "matrixbox-" + "".join([hex(i) for i in wifi.radio.mac_address]).replace("0x","")[:3] # mac-id för hotspot
-wifi_status = ""
-ssl_context = adafruit_connection_manager.get_radio_ssl_context(wifi.radio)
-requests = adafruit_requests.Session(pool, ssl_context)
-first_start = True
-screensaver = time.monotonic()
-
-def start_hotspot():
-    try:
-        wifi.radio.start_ap(ssid=macid)
-        #wifi.radio.start_dhcp_ap() # Removed (maybe causing connection error http://None )
-        pprint("Started WIFI: ")
-        pprint(str(macid))
-        pprint(str(wifi.radio.ipv4_address_ap))
-    except Exception as e: pprint(str(e))
-
-def connect_to_network(timeout=False, silent=False):
-    global wifi_status
-    wifi_status = ""
-    print("Connecting...")
-    try: 
-        if not silent: pprint(str(settings["ssid"]))
-        channel = settings.get("channel", 0)
-        if channel:
-            wifi.radio.connect(str(settings["ssid"]), str(settings["password"]), channel=int(channel), timeout=timeout)
-        else:
-            wifi.radio.connect(str(settings["ssid"]), str(settings["password"]), timeout=timeout)
-        pprint(str(wifi.radio.ipv4_address))
-        savesettings(settings)
-    except Exception as e: 
-        if not silent: 
-            if "unknown failure" in str(e).lower(): e = "Router distance!"
-            if "no network with" in str(e).lower(): e = "Wrong WIFI name"
-            if "authentication failure" in str(e).lower(): e = "Wrong password"
-            print(e)
-            pprint(str(e), color="red")
-        wifi_status = str(e)
-        print(e)
-    return time.monotonic()
-
-@ampule.route("/exit", method="GET")
-def webinterface(request):
-    load_settings.app_running = False
-    return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
-
-@ampule.route("/", method="GET")
-def webinterface(request):
-    global _anim_x
-    _anim_x = 0
-    if load_settings.app_running: 
-        return (200, {}, str(exitbutton) + f"""<br> running app {load_settings.app_running}""")
-    if request.params:
-        if "run" in request.params: load_settings.app_running = request.params["run"]
-    return (200, {}, select_app())
-
-def initialize_app():
-    global autostart
-    ampule_routes_backup = ampule.routes.copy()
-    palette_backup = [palette[i] for i in range(12)]  # restored on exit
-
-    try:
-        clearscreen(lines=True)
-        pprint(f"Starting {load_settings.app_running}...")
-        os.chdir(load_settings.app_running)
-        time.sleep(0.5)
-        ampule.routes.clear()  # apps start with a clean route table
-        import __init__
-    except Exception as e:
-        print(f"{e}")
-        settings["autostart"] = 0
-    finally:
-        for i, backup in enumerate(palette_backup):
-            palette[i] = backup
-        try: microcontroller.cpu.frequency = 160000000
-        except: pass
-        autostart = False
-        ampule.routes = ampule_routes_backup.copy()
+def installed_apps() -> list:
+    def has_code(name):
         try:
-            for codefile in os.listdir():
-                try: del sys.modules[codefile.rsplit(".", 1)[0]]
-                except: pass
-        except: pass
-        gc.collect()  # reclaim the exited app's bitmaps so the next launch is clean
-        display.root_group = rf_group
-        os.chdir("/")
-        clearscreen(lines=True)  # zero the window so a buggy app leaves no artifacts
-        show_logo()
-        _wifi_address = f"IP: {wifi.radio.ipv4_address}" if wifi.radio.ipv4_address else "OFFLINE"
-        pprint(_wifi_address, line=1)
-        pprint("Select app:", line=2)
-        show_first_app()
-        return False
+            return "code.py" in os.listdir(f"{APPS_DIR}/{name}")
+        except OSError:
+            return False
 
-def savesettings(settings):
-    print("Saving...")
-    clearscreen(True)
     try:
-        with open("settings.txt","w") as f:
-            f.write(json.dumps(settings))
-    except:
-         print("Read only!")
-    clearscreen(False)
+        names = os.listdir(APPS_DIR)
+    except OSError:
+        names = []
 
-def installed_apps():
-    installed_apps = []
-    for app in os.listdir("/"):
-        if app == "LICENSE": continue
-        if not "." in app:
-            try:
-                if not "__init__.py" in os.listdir("/" + app): continue
-            except: continue
-            installed_apps.append(app)
-    return installed_apps if len(installed_apps) else ["No apps found"]
+    apps = sorted(name for name in names if "." not in name and has_code(name))
 
-def show_first_app():
-    try: load_settings.installed_apps_list[1]
-    except: load_settings.installed_apps_list = installed_apps()
-    pprint(load_settings.installed_apps_list[0], line=-1, color="yellow", clear=True, _refresh=True)
+    return apps or ["No apps found"]
 
-def next_program_in_list(run=False):
-    try: load_settings.installed_apps_list[1]
-    except: load_settings.installed_apps_list = installed_apps()
-    if run:
-        load_settings.app_running = load_settings.installed_apps_list[0]
-        return
-    print(load_settings.installed_apps_list)
-    load_settings.installed_apps_list.append(load_settings.installed_apps_list[0])
-    load_settings.installed_apps_list.pop(0)
-    scroll_line(load_settings.installed_apps_list[0], color="yellow")
 
-def check_for_button_next_program():
-    global screensaver
-    b = check_if_button_pressed()
-    if b == 0: pass
-    if b == 1: next_program_in_list()
-    elif b == 2: next_program_in_list(run=True)
-    if load_settings.app_running: 
-        load_settings.app_running = initialize_app()
-        screensaver = time.monotonic()
+@router.route("/favicon.svg")
+def favicon(request):
+    return (200, {"Content-Type": "image/svg+xml"}, FAVICON_SVG)
 
-autostart = settings["autostart"]
-screensaver_app = settings.get("screensaver", "starcloud")
-wifi.radio.tx_power = float(settings["wifi_power"])
 
-from web_interface import *
-connect_to_network()
-#first_start = False
+@router.route("/")
+def home(request):
+    if session.instance is not None:
+        app = session.instance
+        body = app.render()
 
-while 1:
-    print("Entered main loop")
-    while not wifi.radio.connected and not wifi.radio.ap_active:
-        check_network_again_timer = time.monotonic()
-        start_hotspot()
-    
-    while wifi.radio.ap_active and not wifi.radio.connected: 
-        ampule.listen(socket)
-        if autostart:
-            print(ampule.listen(socket))
-            load_settings.app_running = autostart
-        check_for_button_next_program()
-        if time.monotonic() > check_network_again_timer + 10:
-            print("Attempting... " + str(wifi.radio.tx_power))
-            wifi.radio.tx_power += 1
-            if wifi.radio.tx_power == 21: wifi.radio.tx_power = 18
-            check_network_again_timer = connect_to_network(timeout=3, silent=True)
-        if first_start == False and wifi.radio.connected: wifi.radio.stop_ap()
-        
-    while wifi.radio.connected or wifi.radio.ap_active:
-        settings["wifi_power"] = wifi.radio.tx_power
-        pprint("Select app:")
-        show_first_app()
-        while wifi.radio.connected:# or wifi.radio.ap_active:
-            first_start = False
-            if autostart:
-                print(ampule.listen(socket))
-                load_settings.app_running = autostart
-            elif not load_settings.app_running: ampule.listen(socket)
-            check_for_button_next_program()
-            logo_anim_step()
+        return (
+            200,
+            {},
+            components.page(app.title or session.current, body, exit_href="/exit"),
+        )
 
-            if screensaver_app and time.monotonic() > screensaver + 60:
-                try: load_settings.app_running = screensaver_app
-                except Exception as e: pprint(e)
-                screensaver = time.monotonic()
+    if "run" in request.params:
+        name = request.params["run"]
+        session.launch(name)
+        body = (
+            f'<meta http-equiv="refresh" content="1" />Starting <b>{name}</b>&hellip;'
+        )
 
-            
-            
-            
+        return (200, {}, components.page("MatrixBOX", body))
+
+    items = "".join(
+        f'<div class="app-item"><span class="app-name">{name}</span>'
+        f'<a class="btn btn-sm" href="/?run={name}">Run</a></div>'
+        for name in installed_apps()
+    )
+    body = (
+        '<div class="logo"><h1>Matrix<span class="brand-yellow">BOX</span></h1>'
+        f"<p>{components.wifi_ip()}</p></div>" + components.card("Apps", items)
+    )
+
+    return (200, {}, components.page("MatrixBOX", body))
+
+
+def _option(value, label, current):
+    selected = " selected" if value == current else ""
+    return f'<option value="{value}"{selected}>{label}</option>'
+
+
+def _rotation_button(deg, current):
+    deg_str = str(deg)
+    is_on = "on" if deg == current else ""
+    arrow_style = "" if deg == 0 else "transform:rotate(" + deg_str + "deg)"
+
+    return (
+        '<button type="button" id="rot_'
+        + deg_str
+        + '" class="'
+        + is_on
+        + '" onclick="setRotation('
+        + deg_str
+        + ')"><span style="display:inline-block;'
+        + arrow_style
+        + '">&#8593;</span><br>'
+        + deg_str
+        + "&deg;</button>"
+    )
+
+
+def _switch(setting_id, label, checked):
+    checked_attr = " checked" if checked else ""
+
+    return (
+        '<div class="switch-row"><span>'
+        + label
+        + '</span><label class="switch"><input type="checkbox" id="'
+        + setting_id
+        + '"'
+        + checked_attr
+        + '><span class="slider"></span></label></div>'
+    )
+
+
+@router.route("/settings")
+def settings_page(request):
+    apps = installed_apps()
+    autostart_options = '<option value="">None</option>' + "".join(
+        _option(name, name, settings.get("autostart")) for name in apps
+    )
+    screensaver_options = '<option value="">None</option>' + "".join(
+        _option(name, name, settings.get("screensaver")) for name in apps
+    )
+    rotation_buttons = "".join(
+        _rotation_button(deg, settings["rotation"]) for deg in (0, 90, 180, 270)
+    )
+
+    ssid = settings["ssid"]
+    password = settings["password"]
+    email = settings["email"]
+    wifi_power = str(settings["wifi_power"])
+    repository_source = settings["repository_source"]
+    repository_branch = settings["repository_branch"]
+    width = str(settings["width"])
+    height = str(settings["height"])
+    tiles = str(settings["tiles"])
+    current_version = updater.local_version("/") or "?"
+
+    body = (
+        components.card(
+            "Wi-Fi",
+            # Plain strings + "+", no f-strings here — see docs/architecture.md.
+            '<label>Network name</label><input type="text" id="ssid" value="'
+            + ssid
+            + '">'
+            '<label>Password</label><div style="position:relative">'
+            '<input type="password" id="password" value="'
+            + password
+            + '" style="padding-right:40px">'
+            '<button type="button" class="pw-toggle" title="Show/hide password" '
+            'onclick="togglePassword(this)">\U0001f441</button></div>'
+            "<script>"
+            "function togglePassword(btn){"
+            "var p=document.getElementById('password');"
+            "var hidden=p.type==='password';"
+            "p.type=hidden?'text':'password';"
+            "btn.textContent=hidden?'\U0001f648':'\U0001f441';"
+            "}"
+            "</script>"
+            '<label>Transmit power (dBm)</label><div class="range-wrap">'
+            '<input type="range" id="wifi_power" min="7" max="20" step="1" value="'
+            + wifi_power
+            + '" oninput="document.getElementById(\'v_wifi_power\').textContent=this.value">'
+            '<span class="range-val" id="v_wifi_power">' + wifi_power + "</span></div>",
+        )
+        + components.card(
+            "Account",
+            '<label>Email</label><input type="text" id="email" value="' + email + '">',
+        )
+        + components.card(
+            "Display rotation", f'<div class="seg">{rotation_buttons}</div>'
+        )
+        + components.card(
+            "Autostart",
+            f'<label>App to launch on boot</label><select id="autostart">{autostart_options}</select>',
+        )
+        + components.card(
+            "Screensaver",
+            f'<label>App to launch after 60s idle</label><select id="screensaver">{screensaver_options}</select>',
+        )
+        + '<div class="card">'
+        '<div class="section-title collapsible-header" id="adv_header" onclick="toggleAdvanced()">'
+        'Advanced<span class="caret">&#9656;</span></div>'
+        '<div id="adv_body" style="display:none">'
+        "<label>Repository source (owner/repo)</label>"
+        '<input type="text" id="repository_source" value="' + repository_source + '">'
+        "<label>Repository branch</label>"
+        '<input type="text" id="repository_branch" value="' + repository_branch + '">'
+        "<label>Panel width (px)</label>"
+        '<input type="text" id="width" value="' + width + '">'
+        "<label>Panel height (px)</label>"
+        '<input type="text" id="height" value="' + height + '">'
+        "<label>Tiles</label>"
+        '<input type="text" id="tiles" value="'
+        + tiles
+        + '">'
+        + _switch("color_correct", "Swap G/B LED pins", settings.get("color_correct"))
+        + '<p style="font-size:.75rem;color:var(--muted);margin-top:6px">'
+        "Changing panel width, height, tiles, or color correction reboots"
+        " the device.</p></div></div>"
+        + components.card(
+            "Updates",
+            '<p style="font-size:.85rem;color:var(--muted);margin-bottom:10px">'
+            "Current version: v" + current_version + "</p>"
+            '<button type="button" class="btn btn-full" onclick="checkUpdates(this)">'
+            "&#x1F504; Check for updates</button>"
+            '<div id="updates_list" style="margin-top:12px"></div>',
+        )
+        + components.save_button()
+        + """<script>
+var selectedRotation = """
+        + str(settings["rotation"])
+        + """;
+function setRotation(deg) {
+  selectedRotation = deg;
+  document.querySelectorAll("[id^=rot_]").forEach(function(b) {
+    b.classList.toggle("on", b.id === "rot_" + deg);
+  });
+}
+function toggleAdvanced() {
+  var body = document.getElementById("adv_body");
+  var open = body.style.display !== "none";
+  body.style.display = open ? "none" : "block";
+  document.getElementById("adv_header").classList.toggle("open", !open);
+}
+function save(b){
+  var q = "ssid=" + encodeURIComponent(document.getElementById("ssid").value)
+    + "&password=" + encodeURIComponent(document.getElementById("password").value)
+    + "&email=" + encodeURIComponent(document.getElementById("email").value)
+    + "&wifi_power=" + document.getElementById("wifi_power").value
+    + "&rotation=" + selectedRotation
+    + "&autostart=" + document.getElementById("autostart").value
+    + "&screensaver=" + document.getElementById("screensaver").value
+    + "&repository_source=" + encodeURIComponent(document.getElementById("repository_source").value)
+    + "&repository_branch=" + encodeURIComponent(document.getElementById("repository_branch").value)
+    + "&width=" + document.getElementById("width").value
+    + "&height=" + document.getElementById("height").value
+    + "&tiles=" + document.getElementById("tiles").value
+    + "&color_correct=" + document.getElementById("color_correct").checked;
+  fetch("/settings?" + q, {method:"POST"}).then(function(){ b.textContent = "✓ Saved"; });
+}
+function checkUpdates(b){
+  b.textContent = "Checking…";
+  fetch("/updates/check", {method:"POST"}).then(function(r){ return r.json(); })
+    .then(function(d){ b.textContent = "Check for updates"; renderUpdates(d); })
+    .catch(function(){ b.textContent = "Check failed"; });
+}
+function renderUpdates(d){
+  var el = document.getElementById("updates_list");
+  var keys = Object.keys(d);
+  if (!keys.length) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:.85rem">Up to date</p>';
+    return;
+  }
+  var h = "";
+  keys.forEach(function(k){
+    var label = k === "/" ? "System" : k;
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;'
+      + 'padding:6px 0"><span>' + label + ' &rarr; v' + d[k] + '</span>'
+      + '<button type="button" class="btn btn-sm" onclick="applyUpdate(\\''
+      + k + '\\', this)">Update</button></div>';
+  });
+  el.innerHTML = h;
+}
+function applyUpdate(name, b){
+  b.textContent = "Updating…";
+  fetch("/updates/apply?target=" + encodeURIComponent(name), {method:"POST"})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        b.textContent = name === "/" ? "Rebooting…" : "Done";
+      } else {
+        b.textContent = "Failed";
+      }
+    })
+    .catch(function(){ b.textContent = "Failed"; });
+}
+</script>"""
+    )
+
+    return (200, {}, components.page("Settings", body, exit_href="/"))
+
+
+@router.route("/settings", method="POST")
+def save_settings(request):
+    p = request.params
+    if "ssid" in p:
+        settings["ssid"] = url_decode(p["ssid"])
+
+    if "password" in p:
+        settings["password"] = url_decode(p["password"])
+
+    if "email" in p:
+        settings["email"] = url_decode(p["email"])
+
+    if "wifi_power" in p:
+        settings["wifi_power"] = p["wifi_power"]
+
+    if "rotation" in p:
+        settings["rotation"] = p["rotation"]
+
+    if "autostart" in p:
+        settings["autostart"] = url_decode(p["autostart"])
+
+    if "screensaver" in p:
+        settings["screensaver"] = url_decode(p["screensaver"])
+
+    if "repository_source" in p:
+        settings["repository_source"] = url_decode(p["repository_source"])
+
+    if "repository_branch" in p:
+        settings["repository_branch"] = url_decode(p["repository_branch"])
+
+    if "width" in p:
+        settings["width"] = p["width"]
+
+    if "height" in p:
+        settings["height"] = p["height"]
+
+    if "tiles" in p:
+        settings["tiles"] = p["tiles"]
+
+    if "color_correct" in p:
+        settings["color_correct"] = p["color_correct"]
+
+    settings.save()
+    display.apply_settings()
+    wifi_manager.apply_settings()
+
+    return (200, {}, "ok")
+
+
+@router.route("/updates/check", method="POST")
+def check_updates(request):
+    updates = updater.check_all(installed_apps())
+
+    return (200, {"Content-Type": "application/json"}, json.dumps(updates))
+
+
+@router.route("/updates/apply", method="POST")
+def apply_update(request):
+    target = request.params.get("target", "")
+    try:
+        if target == "/":
+            updater.update_system()
+        else:
+            updater.update_app(target)
+
+        ok = True
+    except Exception as e:
+        print(f"update failed for {target!r}: {e}")
+        ok = False
+
+    return (200, {"Content-Type": "application/json"}, json.dumps({"ok": ok}))
+
+
+_selector_grid = TextGrid(display.canvas, font=MINI)
+
+
+def _network_status() -> tuple:
+    # (label, value) — label in white, value in yellow, see show_selector().
+    if wifi.radio.connected:
+        return "IP: ", str(wifi.radio.ipv4_address)
+
+    if wifi.radio.ap_active:
+        return "AP: ", wifi_manager.hotspot_ssid
+
+    return "OFFLINE", ""
+
+
+def show_status(text):
+    display.canvas.fill(0)
+    _selector_grid.line(text, 0, color=1, align=Align.LEFT, clear=False)
+    display.refresh()
+
+
+def show_selector(apps, index):
+    display.canvas.fill(0)
+    x = display.canvas.text("Matrix", 0, 0, font=MINI, color=5)
+    display.canvas.text("BOX", x, 0, font=MINI, color=1)
+
+    label, value = _network_status()
+    y = _selector_grid.row_y(1)
+    x = display.canvas.text(label, 0, y, font=MINI, color=5)
+    display.canvas.text(value, x, y, font=MINI, color=1)
+
+    _selector_grid.line("Select app:", 2, color=5, align=Align.LEFT, clear=False)
+    _selector_grid.line(apps[index], -1, color=1, align=Align.LEFT, clear=False)
+    display.refresh()
+
+
+def _slide_to_next_app(old_name, new_name):
+    row_height = _selector_grid.row_height
+    y = _selector_grid.row_y(-1)
+
+    old_canvas = display.new_canvas(display.width, row_height)
+    old_canvas.text(old_name, 0, 0, font=MINI, color=1)
+    new_canvas = display.new_canvas(display.width, row_height)
+    new_canvas.text(new_name, 0, 0, font=MINI, color=1)
+
+    speed = max(2, display.width // 16)  # ~16 frames to cross the row
+    scroller = Scroller.transition(
+        old_canvas, new_canvas, display.width, row_height, speed=speed
+    )
+
+    def draw():
+        display.canvas.fill_rect(0, y, display.width, row_height, 0)
+        scroller.draw(display.canvas, 0, y)
+        display.refresh()
+
+    scroller.run_to_completion(draw)
+
+
+# Snapshot for run_app() to evict app-added modules only — see docs/architecture.md.
+_kernel_modules = frozenset(sys.modules.keys())
+
+
+def run_app(name):
+    reserved = display.palette_allocator.reserved
+    palette_backup = [display.palette[i] for i in range(reserved)]
+    route_count = len(router.routes)
+    session.current = name
+    crashed = False
+
+    try:
+        display.canvas.fill(0)
+        display.refresh()
+        os.chdir(f"{APPS_DIR}/{name}")
+        gc.collect()  # free whatever the selector/web UI left behind before the app's own imports need the room
+        import code  # noqa: F401 -- the app itself; blocks until it exits
+    except SystemExit:
+        pass  # sys.exit() inside an app's loop is a normal way to leave
+    except Exception as e:
+        crashed = True
+        print(f"app {name!r} crashed: {e}")
+    finally:
+        session.instance = None
+        session.current = None
+        # Drop anything the app added beyond the permanent routes.
+        del router.routes[route_count:]
+        for i, rgb in enumerate(palette_backup):
+            display.palette[i] = rgb
+
+        display.palette_allocator.reset()
+        display.restore_root_canvas()
+        for module_name in list(sys.modules):
+            if module_name not in _kernel_modules:
+                del sys.modules[module_name]
+
+        os.chdir("/")
+        gc.collect()
+
+    if crashed:
+        # A crashing autostart/screensaver app would otherwise relaunch
+        # itself forever — disable whichever role pointed at it.
+        disabled = False
+        if settings.get("autostart") == name:
+            settings["autostart"] = ""
+            disabled = True
+
+        if settings.get("screensaver") == name:
+            settings["screensaver"] = ""
+            disabled = True
+
+        if disabled:
+            settings.save()
+            print(f"app {name!r} crashed — disabled as autostart/screensaver")
+
+
+def main():
+    show_status(f"Connecting: {settings['ssid'] or '(no ssid set)'}")
+    wifi_manager.connect()
+
+    apps = installed_apps()
+    selected = 0
+    show_selector(apps, selected)
+    screensaver_at = time.monotonic()
+    autostart_done = False  # fires once per boot, not once per return to idle
+
+    while True:
+        wifi_manager.maintain()
+        router.listen(server_socket)
+
+        if updater.reboot_pending or display.reboot_pending:
+            # The response for the request that triggered this has already
+            # been sent — router.listen() is synchronous — see docs/architecture.md.
+            time.sleep(0.5)
+            microcontroller.reset()
+
+        press = button.poll()
+        if press == SHORT_PRESS:
+            next_selected = (selected + 1) % len(apps)
+            _slide_to_next_app(apps[selected], apps[next_selected])
+            selected = next_selected
+            screensaver_at = time.monotonic()
+        elif press == LONG_PRESS:
+            session.launch(apps[selected])
+
+        autostart = settings.get("autostart")
+        if autostart and not autostart_done and not session.requested:
+            session.launch(autostart)
+            autostart_done = True
+
+        if session.requested:
+            name = session.requested
+            session.requested = None
+            run_app(name)
+            apps = installed_apps()
+            selected = 0
+            show_selector(apps, selected)
+            screensaver_at = time.monotonic()
+
+        screensaver_app = settings.get("screensaver")
+        if screensaver_app and time.monotonic() - screensaver_at > 60:
+            session.launch(screensaver_app)
+
+        time.sleep(0.01)
+
+
+main()
