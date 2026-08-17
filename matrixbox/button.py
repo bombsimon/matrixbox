@@ -9,7 +9,7 @@ LONG_PRESS = 2
 
 
 class Button:
-    # Debounce logic: see docs/architecture.md.
+    # Debounce logic: see docs/ARCHITECTURE.md.
     def __init__(
         self,
         pin,
@@ -59,7 +59,7 @@ class Button:
         # bouncy signal must never delay noticing that long_press_seconds
         # has genuinely elapsed since the press was confirmed, or elapsed
         # wall-clock time silently piles up until the bounce happens to
-        # settle, at which point it fires immediately (see docs/architecture.md).
+        # settle, at which point it fires immediately (see docs/ARCHITECTURE.md).
         if (
             self._stable_pressed
             and not self._long_fired
@@ -72,9 +72,9 @@ class Button:
         return SHORT_PRESS if short_press else NONE
 
 
-# TX companion pin: see docs/architecture.md. RX polarity is the standard
+# TX companion pin: see docs/ARCHITECTURE.md. RX polarity is the standard
 # pull-up default (idle high, pressed low) — confirmed via /console on
-# 2026-08-17 with a clean, unambiguous trace (see docs/architecture.md);
+# 2026-08-17 with a clean, unambiguous trace (see docs/ARCHITECTURE.md);
 # an earlier measurement, taken before matrixbox.display was fixed to
 # import before matrixbox.button, found the opposite and is now stale.
 _tx_companion = digitalio.DigitalInOut(board.TX)

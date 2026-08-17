@@ -144,7 +144,7 @@ def settings_page(request):
     body = (
         components.card(
             "Wi-Fi",
-            # Plain strings + "+", no f-strings here — see docs/architecture.md.
+            # Plain strings + "+", no f-strings here — see docs/ARCHITECTURE.md.
             '<label>Network name</label><input type="text" id="ssid" value="'
             + ssid
             + '">'
@@ -416,7 +416,7 @@ def _slide_to_next_app(old_name, new_name):
     scroller.run_to_completion(draw)
 
 
-# Snapshot for run_app() to evict app-added modules only — see docs/architecture.md.
+# Snapshot for run_app() to evict app-added modules only — see docs/ARCHITECTURE.md.
 _kernel_modules = frozenset(sys.modules.keys())
 
 
@@ -488,7 +488,7 @@ def main():
 
         if updater.reboot_pending or display.reboot_pending:
             # The response for the request that triggered this has already
-            # been sent — router.listen() is synchronous — see docs/architecture.md.
+            # been sent — router.listen() is synchronous — see docs/ARCHITECTURE.md.
             time.sleep(0.5)
             microcontroller.reset()
 

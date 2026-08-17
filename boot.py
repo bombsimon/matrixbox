@@ -4,7 +4,7 @@ import time
 import storage
 import supervisor
 
-supervisor.runtime.autoreload = False  # see docs/architecture.md
+supervisor.runtime.autoreload = False  # see docs/ARCHITECTURE.md
 
 from matrixbox.button import button
 from matrixbox.display import display
@@ -44,7 +44,7 @@ if "unlock" in os.listdir("/"):
     storage.enable_usb_drive()
     _splash("Unlocking filesystem")
 elif "dev_mode" in os.listdir("/"):
-    # disable_concurrent_write_protection: see docs/architecture.md.
+    # disable_concurrent_write_protection: see docs/ARCHITECTURE.md.
     storage.remount("/", readonly=False, disable_concurrent_write_protection=True)
     _splash("Dev mode: unlocked")
 elif _button_held_on_boot():

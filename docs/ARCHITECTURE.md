@@ -34,6 +34,17 @@ app-specific. That's also why nothing needs to be cleared or restored on
 the route table for the common case: the routes never reference a
 particular app's state directly.
 
+`App.needs_network()` (default `False`) is the generic version of
+something the old codebase only had inside one app (`departures`): when
+`True`, `run()` stops calling `on_update()` and shows the hotspot's
+SSID/IP instead, for as long as Wi-Fi is down — without the user having
+to exit the app to reach settings and fix the network. Nothing new here
+actually *brings up* the hotspot; `WifiManager.maintain()` already does
+that unconditionally, for the kernel and every app, whether or not
+`needs_network()` is overridden — this only adds the on-screen prompt,
+gated behind the flag so apps that don't need connectivity (or fetch
+lazily/tolerate being offline) aren't interrupted by it.
+
 ## matrixbox/display.py — Canvas, Display
 
 The only module (besides `matrixbox.boards`) that imports

@@ -3,7 +3,7 @@ import os
 
 
 class JSONStore:
-    # Values coerce to the type of their default — see docs/architecture.md.
+    # Values coerce to the type of their default — see docs/ARCHITECTURE.md.
     def __init__(self, path, defaults):
         self._path = path
         self._defaults = dict(defaults)
@@ -18,7 +18,7 @@ class JSONStore:
             return self
         except ValueError as e:
             # A corrupt file (e.g. a write interrupted by power loss —
-            # see docs/architecture.md) silently falling back to blank
+            # see docs/ARCHITECTURE.md) silently falling back to blank
             # defaults is how ssid/password vanish without a trace, so
             # this stays loud even though it's still non-fatal.
             print(f"could not parse {self._path}, using defaults: {e}")
@@ -33,7 +33,7 @@ class JSONStore:
     def save(self):
         # Write to a temp file and rename over the real one — atomic, so an
         # interrupted write (power loss mid-save) can never leave the real
-        # file half-written or trailing garbage behind — see docs/architecture.md.
+        # file half-written or trailing garbage behind — see docs/ARCHITECTURE.md.
         tmp_path = self._path + ".tmp"
         try:
             with open(tmp_path, "w") as f:
@@ -111,7 +111,7 @@ DEFAULTS = {
     "ssid": "",
     "password": "",
     "channel": 0,
-    "autostart": "",  # "" = off, else an app directory name — see docs/architecture.md
+    "autostart": "",  # "" = off, else an app directory name — see docs/ARCHITECTURE.md
     "screensaver": "",
     "rotation": 0,
     "width": 64,
@@ -120,7 +120,7 @@ DEFAULTS = {
     "wifi_power": 15,
     "color_correct": False,
     "email": "",
-    "repository_source": "MatrixBOX-dev/matrixbox",  # GitHub "owner/repo" — see docs/architecture.md
+    "repository_source": "MatrixBOX-dev/matrixbox",  # GitHub "owner/repo" — see docs/ARCHITECTURE.md
     "repository_branch": "main",
 }
 

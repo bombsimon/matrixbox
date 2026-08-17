@@ -75,11 +75,11 @@ across that group — CircuitPython's parser handles merged adjacent
 literals differently from CPython there, in ways that pass
 `py_compile`/`ruff` and only surface on-device. A single standalone
 f-string is fine; plain `+` concatenation is the safe default for
-anything bigger. Full incident history in `docs/architecture.md`.
+anything bigger. Full incident history in `docs/ARCHITECTURE.md`.
 
 ## Deeper internals
 
-`docs/architecture.md` holds the "why" behind non-obvious decisions —
+`docs/ARCHITECTURE.md` holds the "why" behind non-obvious decisions —
 CircuitPython quirks found the hard way, hardware initialization
 ordering, things that look like bugs but aren't. It's organized by file
 name on purpose (source of truth for "where this lives") but never cites

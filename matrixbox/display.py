@@ -88,7 +88,7 @@ class Canvas:
 
                         self.pixel(px + w, y + h, color)
             else:
-                # Shaded glyphs store literal palette indices, not a bitmask — see docs/architecture.md.
+                # Shaded glyphs store literal palette indices, not a bitmask — see docs/ARCHITECTURE.md.
                 for w in range(gw):
                     for h in range(font.height):
                         self.pixel(px + w, y + h, int(glyph[h + 1][w]))
@@ -128,11 +128,11 @@ class Display:
         self.width = self._hw.width
         self.height = self._hw.height
 
-        # Flush stale panel data before building real content — see docs/architecture.md.
+        # Flush stale panel data before building real content — see docs/ARCHITECTURE.md.
         self._hw.root_group = displayio.Group()
         self._hw.refresh()
 
-        self._value_count = 20  # see docs/architecture.md
+        self._value_count = 20  # see docs/ARCHITECTURE.md
         palette = displayio.Palette(self._value_count, dither=False)
         for slot, rgb in enumerate(Color.SYSTEM_PALETTE):
             palette[slot] = rgb
@@ -153,7 +153,7 @@ class Display:
         # above, so a change to any of these needs a fresh boot to take
         # effect — apply_settings() compares against this snapshot rather
         # than the live hardware object, which doesn't expose tiles/color
-        # correction for comparison — see docs/architecture.md.
+        # correction for comparison — see docs/ARCHITECTURE.md.
         self._boot_geometry = (
             int(settings["width"]),
             int(settings["height"]),
@@ -196,7 +196,7 @@ class Display:
             # Not an immediate reset() — this runs inside the settings POST
             # handler, before settings.save()'s write is necessarily flushed
             # to flash and before the HTTP response is sent. main()'s loop
-            # resets once both have safely happened — see docs/architecture.md.
+            # resets once both have safely happened — see docs/ARCHITECTURE.md.
             self.reboot_pending = True
 
 

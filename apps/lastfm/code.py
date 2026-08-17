@@ -41,11 +41,14 @@ class LastFmApp(App):
         "idle_timeout": 10,  # minutes of no music before auto-exit; 0 = never
     }
 
+    def needs_network(self) -> bool:
+        return True
+
     def on_start(self):
         with open("template.html") as f:
             self.html_body = f.read()
 
-        # Palette slots re-allocated fresh every launch — see docs/architecture.md.
+        # Palette slots re-allocated fresh every launch — see docs/ARCHITECTURE.md.
         self.artist_slot = display.palette_allocator.allocate()
         self.song_slot = display.palette_allocator.allocate()
         self.dash_slot = display.palette_allocator.allocate()

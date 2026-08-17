@@ -1,4 +1,4 @@
-# Every submodule imported eagerly here — see docs/architecture.md.
+# Every submodule imported eagerly here — see docs/ARCHITECTURE.md.
 import matrixbox.app
 import matrixbox.boards
 import matrixbox.button

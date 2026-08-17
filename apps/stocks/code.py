@@ -53,6 +53,9 @@ class StocksApp(App):
         "graph_dwell": 8,
     }
 
+    def needs_network(self) -> bool:
+        return True
+
     def on_start(self):
         with open("template.html") as f:
             self.html_body = f.read()

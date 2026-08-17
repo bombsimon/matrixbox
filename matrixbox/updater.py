@@ -8,7 +8,7 @@ BINARY_EXTENSIONS = ("mpy", "gif", "bmp", "png", "jpg", "bin", "raw")
 
 # Set by update_system(), read by main.py's loop — a reset from inside the
 # request handler that triggered it would kill the response before it's
-# sent — see docs/architecture.md.
+# sent — see docs/ARCHITECTURE.md.
 reboot_pending = False
 
 # Populated by check_all(); {"/" or app_name: new_version}. Read by
@@ -39,7 +39,7 @@ def _tree_url():
 
 
 def local_version(dir_path):
-    # Version marker: a file named "v<version>" — see docs/architecture.md.
+    # Version marker: a file named "v<version>" — see docs/ARCHITECTURE.md.
     try:
         names = os.listdir(dir_path)
     except OSError:
@@ -78,7 +78,7 @@ def is_newer(remote, local) -> bool:
 def fetch_remote_tree() -> dict:
     # One recursive tree call lists every file in the repo — cheaper than
     # a directory listing per app, and raw.githubusercontent.com has no
-    # directory-listing endpoint at all — see docs/architecture.md.
+    # directory-listing endpoint at all — see docs/ARCHITECTURE.md.
     r = http.get(_tree_url(), headers=HEADERS)
     tree = r.json()["tree"]
     r.close()
@@ -133,7 +133,7 @@ def check_system_update(tree=None):
 
 
 def check_all(installed_apps) -> dict:
-    # One tree fetch covers every check, system included — see docs/architecture.md.
+    # One tree fetch covers every check, system included — see docs/ARCHITECTURE.md.
     # Mutates `available` in place rather than rebinding it, so a
     # `from matrixbox.updater import available` elsewhere (components.navbar())
     # keeps seeing updates — a rebind would leave that import stale.
@@ -173,7 +173,7 @@ def _download_all(files, url_for, dest_for):
     # Two-pass: download everything into memory and confirm every file
     # succeeded before writing anything to disk, so a network failure
     # partway through never leaves an app (or the system) half-updated
-    # — see docs/architecture.md.
+    # — see docs/ARCHITECTURE.md.
     downloads = []
     for path in files:
         r = http.get(url_for(path), headers=HEADERS)

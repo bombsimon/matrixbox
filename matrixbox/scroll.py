@@ -53,7 +53,7 @@ class Scroller:
         direction: str = Direction.LEFT,
         speed: int = 1,
     ) -> "Scroller":
-        # One-shot old->new slide, never resets back — see docs/architecture.md.
+        # One-shot old->new slide, never resets back — see docs/ARCHITECTURE.md.
         if direction in _HORIZONTAL:
             strip = display.new_canvas(
                 old.width + new.width, max(old.height, new.height)
@@ -83,7 +83,7 @@ class Scroller:
 
     @property
     def finished(self) -> bool:
-        # See docs/architecture.md — not a useful loop-exit check on a looping Scroller.
+        # See docs/ARCHITECTURE.md — not a useful loop-exit check on a looping Scroller.
         return self.phase == "end"
 
     def run_to_completion(self, draw):

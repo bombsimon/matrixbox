@@ -32,7 +32,7 @@ def rgb_to_hex(rgb: tuple) -> str:
 
 
 class PaletteAllocator:
-    # Always re-allocate, never hardcode a slot number — see docs/architecture.md.
+    # Always re-allocate, never hardcode a slot number — see docs/ARCHITECTURE.md.
     def __init__(self, palette, size, reserved=8):
         self._palette = palette
         self._size = size

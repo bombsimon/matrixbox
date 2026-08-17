@@ -106,7 +106,7 @@ class Router:
             else:
                 self._send_response(client, 404, {}, "Not found")
         except BaseException as e:
-            # Last line of defense for one request — must never itself raise (see docs/architecture.md).
+            # Last line of defense for one request — must never itself raise (see docs/ARCHITECTURE.md).
             try:
                 sys.print_exception(e)
             except Exception:
@@ -228,5 +228,5 @@ class Router:
         return sent_total
 
 
-# The one route table for the whole device — see docs/architecture.md.
+# The one route table for the whole device — see docs/ARCHITECTURE.md.
 router = Router()

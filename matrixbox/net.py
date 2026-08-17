@@ -1,6 +1,6 @@
 import time
 
-# Adafruit's own libraries, unmodified, live in /lib not matrixbox/ — see docs/architecture.md.
+# Adafruit's own libraries, unmodified, live in /lib not matrixbox/ — see docs/ARCHITECTURE.md.
 import adafruit_connection_manager
 import adafruit_requests
 import socketpool

@@ -1,14 +1,32 @@
 import json  # noqa: I001 -- ruff wants to re-merge/re-sort the import groups below; don't
 import time
 
+import wifi
+
 # matrixbox.display must import (and initialize the RGBMatrix hardware)
-# before matrixbox.button claims the button's GPIO pins — see docs/architecture.md.
+# before matrixbox.button claims the button's GPIO pins — see docs/ARCHITECTURE.md.
 from matrixbox.display import display
 
 from matrixbox.button import LONG_PRESS, SHORT_PRESS, button
+from matrixbox.fonts import MINI
+from matrixbox.layout import Align, TextGrid
 from matrixbox.net import server_socket, wifi_manager
 from matrixbox.settings import AppSettings, settings
 from matrixbox.web import router, url_decode
+
+
+def _show_network_prompt():
+    # WifiManager.maintain() already brought the hotspot up — see docs/ARCHITECTURE.md.
+    grid = TextGrid(display.canvas, font=MINI)
+    display.canvas.fill(0)
+    grid.line("No network", 0, color=4, align=Align.LEFT, clear=False)
+    grid.line("Connect to:", 1, color=5, align=Align.LEFT, clear=False)
+    grid.line(wifi_manager.hotspot_ssid, 2, color=1, align=Align.LEFT, clear=False)
+    ap_ip = wifi.radio.ipv4_address_ap
+    grid.line(
+        str(ap_ip) if ap_ip else "...", -1, color=2, align=Align.LEFT, clear=False
+    )
+    display.refresh()
 
 
 class AppSession:
@@ -75,8 +93,14 @@ class App:
     def on_stop(self):
         """Override: cleanup after the loop ends."""
 
+    def needs_network(self) -> bool:
+        """Override: True pauses on_update() and shows the hotspot's SSID/IP
+        on the display instead, for as long as Wi-Fi is down."""
+        return False
+
     def run(self):
         self.on_start()
+        showing_network_prompt = False
         while self.running:
             wifi_manager.maintain()
             router.listen(server_socket)
@@ -86,7 +110,14 @@ class App:
             elif press == SHORT_PRESS:
                 self.on_button()
 
-            self.on_update(time.monotonic())
+            if self.needs_network() and not wifi.radio.connected:
+                if not showing_network_prompt:
+                    _show_network_prompt()
+                    showing_network_prompt = True
+            else:
+                showing_network_prompt = False
+                self.on_update(time.monotonic())
+
             time.sleep(self.tick_seconds)
 
         self.on_stop()

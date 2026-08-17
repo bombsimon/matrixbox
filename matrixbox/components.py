@@ -66,7 +66,7 @@ def _toggle_led(request):
     global _led_off
     _led_off = not _led_off
     display.set_visible(not _led_off)
-    display.refresh()  # auto_refresh is off — see docs/architecture.md
+    display.refresh()  # auto_refresh is off — see docs/ARCHITECTURE.md
 
     return (200, {"Content-Type": "application/json"}, json.dumps({"off": _led_off}))
 
@@ -113,7 +113,7 @@ def navbar(title: str = None, *, exit_href: str = None) -> str:
     files_link = '<a class="nav-x" href="/files" title="Files">&#x1F4C1;</a>'
     lock_icon = "&#x1F513;" if _unlocked() else "&#x1F512;"
     led_class = " led-off" if _led_off else ""
-    # Plain strings + "+", no f-strings here — see docs/architecture.md.
+    # Plain strings + "+", no f-strings here — see docs/ARCHITECTURE.md.
     lock_button = (
         '<button class="nav-x" title="Toggle filesystem lock (reboots)" '
         "onclick=\"if(confirm('Reboot to toggle the filesystem lock?'))"
@@ -176,7 +176,7 @@ def card(title: str, content: str) -> str:
 
 
 def save_button(onclick: str = "save(this)") -> str:
-    # Shared by the settings page and every app's template.html — see docs/architecture.md.
+    # Shared by the settings page and every app's template.html — see docs/ARCHITECTURE.md.
     return (
         '<button class="btn btn-full btn-save" onclick="'
         + onclick
