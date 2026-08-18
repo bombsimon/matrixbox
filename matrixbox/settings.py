@@ -136,8 +136,8 @@ DEFAULTS = {
     "wifi_power": 15,
     "color_correct": False,
     "email": "",
-    "repository_source": "MatrixBOX-dev/matrixbox",  # GitHub "owner/repo" — see docs/ARCHITECTURE.md
-    "repository_branch": "main",
+    "repository_source": "bombsimon/matrixbox",  # GitHub "owner/repo", temporary — see docs/ARCHITECTURE.md
+    "repository_branch": "matrixbox-v2",
 }
 
 
