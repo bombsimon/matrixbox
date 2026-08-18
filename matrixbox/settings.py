@@ -34,6 +34,15 @@ class JSONStore:
         # Write to a temp file and rename over the real one — atomic, so an
         # interrupted write (power loss mid-save) can never leave the real
         # file half-written or trailing garbage behind — see docs/ARCHITECTURE.md.
+        #
+        # matrixbox.display isn't imported at module level here — it in
+        # turn imports matrixbox.settings for the panel geometry, and a
+        # top-level import back would be circular — see docs/ARCHITECTURE.md.
+        from matrixbox.display import display
+
+        display.set_visible(False)
+        display.refresh()
+
         tmp_path = self._path + ".tmp"
         try:
             with open(tmp_path, "w") as f:
@@ -42,6 +51,9 @@ class JSONStore:
             os.rename(tmp_path, self._path)
         except OSError as e:
             print(f"could not save {self._path}: {e}")
+
+        display.set_visible(True)
+        display.refresh()
 
         return self
 
@@ -111,6 +123,10 @@ DEFAULTS = {
     "ssid": "",
     "password": "",
     "channel": 0,
+    "static_ip": "",  # "" = DHCP — see docs/ARCHITECTURE.md
+    "static_netmask": "",
+    "static_gateway": "",
+    "static_dns": "",
     "autostart": "",  # "" = off, else an app directory name — see docs/ARCHITECTURE.md
     "screensaver": "",
     "rotation": 0,

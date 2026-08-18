@@ -586,5 +586,54 @@ Uninstalling is a plain recursive directory delete
 (`updater.uninstall_app()`), guarded by requiring the name to already be
 in `_installed_app_names()` before touching the filesystem — that also
 doubles as the path-traversal guard, since a crafted name can't match a
-real installed directory. Not yet exercised on real hardware by choice —
-delete is delete.
+real installed directory. Confirmed working on real hardware — deleted
+and then restored the weather app as a live test of the route itself.
+
+## Settings saves blank the display too, same as sync.sh
+
+The old codebase blanked the panel (`display.root_group.hidden = True`)
+around every filesystem write it made from the web UI — not just big
+ones — since even a small write can visibly disturb the panel while the
+flash operation has the CPU's attention. `JSONStore.save()` (used by
+both global settings and every app's own config) does the same now via
+`display.set_visible()`, so this is automatic for every save — no route
+handler needs to remember to wrap its own `.save()` call.
+
+`matrixbox.display` is imported *inside* `save()`, not at module level —
+`matrixbox.display` itself imports `matrixbox.settings` for the panel's
+configured width/height/tiles, so a top-level import the other way would
+be circular. By the time anything actually calls `.save()` (well after
+boot), `matrixbox.display` is already fully imported and cached, so the
+inline import just costs a `sys.modules` lookup.
+
+## Static IP — ported from departures' `no_dhcp`, made a system setting
+
+The old codebase's static-IP support (`apps/departures/functions.py`'s
+`no_dhcp` file + `manual_dns()`) only existed inside the departures app,
+gated behind an obscure hidden toggle (`varinit.dns`, flipped by visiting
+`/dns`) most users would never find. It's genuinely a device-wide network
+setting, not an app concern, so it's part of `Settings` (`static_ip`/
+`static_netmask`/`static_gateway`/`static_dns` in `matrixbox/settings.py`'s
+`DEFAULTS`) and applied by `WifiManager._apply_static_ip()` — always
+visible in Settings → Advanced, not hidden behind a secret route.
+
+A blank `static_ip` means DHCP, same "presence implies enabled" convention
+the old `no_dhcp` file itself used, rather than a separate on/off flag
+that could disagree with the address fields. `_apply_static_ip()` must run
+*before* `wifi.radio.connect()` — CircuitPython only accepts
+`set_ipv4_address()` while not yet associated to an AP, matching the old
+code's own call order (`manual_dns()` before `wifi.radio.connect()`).
+
+## WiFi network scan — a manual, blocking action
+
+`wifi.radio.start_scanning_networks()` blocks for several seconds and
+freezes everything else on the device while it runs (single cooperative
+loop — no request handling, no app switching, no display refresh happens
+until it returns). That's fine for what it's for: an explicit "Scan"
+button click on the Settings page, not a background or automatic check.
+`/wifi/scan` (`main.py`) dedupes by SSID (keeping the strongest of any
+duplicate, since the same network can show up on multiple channels/APs)
+and returns them sorted by signal strength. The result only ever *fills*
+the existing SSID text input via a picker `<select>` — it never replaces
+manual entry, since not every network being connected to will show up in
+a scan (hidden SSIDs, being out of range at setup time, etc).

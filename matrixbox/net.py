@@ -1,3 +1,4 @@
+import ipaddress
 import time
 
 # Adafruit's own libraries, unmodified, live in /lib not matrixbox/ — see docs/ARCHITECTURE.md.
@@ -49,6 +50,7 @@ class WifiManager:
         password = str(self.settings["password"])
         channel = int(self.settings.get("channel", 0) or 0)
         try:
+            self._apply_static_ip()
             if channel:
                 wifi.radio.connect(ssid, password, channel=channel, timeout=timeout)
             else:
@@ -59,6 +61,28 @@ class WifiManager:
             self.status = str(e)
             if not silent:
                 print("wifi connect failed:", e)
+
+    def _apply_static_ip(self):
+        # A blank static_ip means DHCP (the default) — matches the old
+        # codebase's convention of a static config only existing at all
+        # when the user set one, rather than a separate on/off toggle —
+        # see docs/ARCHITECTURE.md. Must run before connect(): CircuitPython
+        # only accepts a manual IPv4 config while not yet associated.
+        static_ip = str(self.settings.get("static_ip", ""))
+        if not static_ip:
+            return
+
+        wifi.radio.stop_dhcp()
+        wifi.radio.set_ipv4_address(
+            ipv4=ipaddress.IPv4Address(static_ip),
+            netmask=ipaddress.IPv4Address(
+                str(self.settings.get("static_netmask", "")) or "255.255.255.0"
+            ),
+            gateway=ipaddress.IPv4Address(str(self.settings.get("static_gateway", ""))),
+            ipv4_dns=ipaddress.IPv4Address(
+                str(self.settings.get("static_dns", "")) or "8.8.8.8"
+            ),
+        )
 
     def start_hotspot(self):
         try:

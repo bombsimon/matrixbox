@@ -308,6 +308,10 @@ def settings_page(request):
     password = settings["password"]
     email = settings["email"]
     wifi_power = str(settings["wifi_power"])
+    static_ip = settings["static_ip"]
+    static_netmask = settings["static_netmask"]
+    static_gateway = settings["static_gateway"]
+    static_dns = settings["static_dns"]
     repository_source = settings["repository_source"]
     repository_branch = settings["repository_branch"]
     width = str(settings["width"])
@@ -319,9 +323,47 @@ def settings_page(request):
         components.card(
             "Wi-Fi",
             # Plain strings + "+", no f-strings here — see docs/ARCHITECTURE.md.
-            '<label>Network name</label><input type="text" id="ssid" value="'
-            + ssid
-            + '">'
+            '<label>Network name</label><div style="display:flex;gap:8px">'
+            '<input type="text" id="ssid" value="' + ssid + '" style="flex:1">'
+            '<button type="button" class="btn btn-sm" onclick="scanWifi(this)">Scan</button>'
+            "</div>"
+            '<select id="ssid_found" style="display:none;margin-top:8px" onchange="pickScanned()"></select>'
+            '<p id="scan_status" style="font-size:.75rem;color:var(--muted);margin-top:6px;min-height:14px"></p>'
+            "<script>"
+            "function scanWifi(b){"
+            "b.textContent='Scanning\\u2026';b.disabled=true;"
+            "var status=document.getElementById('scan_status');"
+            "status.textContent='Scanning for networks (a few seconds)\\u2026';"
+            "fetch('/wifi/scan',{method:'POST'}).then(function(r){return r.json()})"
+            ".then(function(list){"
+            "b.textContent='Scan';b.disabled=false;"
+            "if(list.error){status.textContent='Scan failed.';return;}"
+            "var sel=document.getElementById('ssid_found');"
+            "sel.innerHTML='';"
+            "var blank=document.createElement('option');"
+            "blank.value='';blank.textContent='Select a network\\u2026';"
+            "sel.appendChild(blank);"
+            "list.forEach(function(n){"
+            "var opt=document.createElement('option');"
+            "opt.value=n.ssid;"
+            "opt.textContent=n.ssid+' ('+n.rssi+' dBm, ch '+n.channel+')';"
+            "sel.appendChild(opt);"
+            "});"
+            "sel.style.display=list.length?'':'none';"
+            "status.textContent=list.length?"
+            "(list.length+' network'+(list.length===1?'':'s')+' found \\u2014 pick one or keep typing above'):"
+            "'No networks found.';"
+            "})"
+            ".catch(function(){"
+            "b.textContent='Scan';b.disabled=false;"
+            "status.textContent='Scan failed.';"
+            "});"
+            "}"
+            "function pickScanned(){"
+            "var sel=document.getElementById('ssid_found');"
+            "if(sel.value)document.getElementById('ssid').value=sel.value;"
+            "}"
+            "</script>"
             '<label>Password</label><div style="position:relative">'
             '<input type="password" id="password" value="'
             + password
@@ -361,6 +403,25 @@ def settings_page(request):
         '<div class="section-title collapsible-header" id="adv_header" onclick="toggleAdvanced()">'
         'Advanced<span class="caret">&#9656;</span></div>'
         '<div id="adv_body" style="display:none">'
+        "<label>Static IP (leave blank for DHCP)</label>"
+        '<input type="text" id="static_ip" placeholder="e.g. 192.168.1.50" value="'
+        + static_ip
+        + '">'
+        "<label>Netmask</label>"
+        '<input type="text" id="static_netmask" placeholder="255.255.255.0" value="'
+        + static_netmask
+        + '">'
+        "<label>Gateway</label>"
+        '<input type="text" id="static_gateway" placeholder="e.g. 192.168.1.1" value="'
+        + static_gateway
+        + '">'
+        "<label>DNS (optional)</label>"
+        '<input type="text" id="static_dns" placeholder="e.g. 8.8.8.8" value="'
+        + static_dns
+        + '">'
+        '<p style="font-size:.75rem;color:var(--muted);margin-top:6px">'
+        "IP, netmask, and gateway are all required together for a static"
+        " address — reconnect (or reboot) to apply.</p>"
         "<label>Repository source (owner/repo)</label>"
         '<input type="text" id="repository_source" value="' + repository_source + '">'
         "<label>Repository branch</label>"
@@ -407,6 +468,10 @@ function save(b){
     + "&password=" + encodeURIComponent(document.getElementById("password").value)
     + "&email=" + encodeURIComponent(document.getElementById("email").value)
     + "&wifi_power=" + document.getElementById("wifi_power").value
+    + "&static_ip=" + encodeURIComponent(document.getElementById("static_ip").value)
+    + "&static_netmask=" + encodeURIComponent(document.getElementById("static_netmask").value)
+    + "&static_gateway=" + encodeURIComponent(document.getElementById("static_gateway").value)
+    + "&static_dns=" + encodeURIComponent(document.getElementById("static_dns").value)
     + "&rotation=" + selectedRotation
     + "&autostart=" + document.getElementById("autostart").value
     + "&screensaver=" + document.getElementById("screensaver").value
@@ -475,6 +540,18 @@ def save_settings(request):
     if "wifi_power" in p:
         settings["wifi_power"] = p["wifi_power"]
 
+    if "static_ip" in p:
+        settings["static_ip"] = url_decode(p["static_ip"])
+
+    if "static_netmask" in p:
+        settings["static_netmask"] = url_decode(p["static_netmask"])
+
+    if "static_gateway" in p:
+        settings["static_gateway"] = url_decode(p["static_gateway"])
+
+    if "static_dns" in p:
+        settings["static_dns"] = url_decode(p["static_dns"])
+
     if "rotation" in p:
         settings["rotation"] = p["rotation"]
 
@@ -507,6 +584,41 @@ def save_settings(request):
     wifi_manager.apply_settings()
 
     return (200, {}, "ok")
+
+
+@router.route("/wifi/scan", method="POST")
+def wifi_scan(request):
+    # Blocking for a few seconds — a manual, explicit action, not something
+    # that runs in the background — see docs/ARCHITECTURE.md.
+    found = {}
+    try:
+        for network in wifi.radio.start_scanning_networks(
+            start_channel=1, stop_channel=14
+        ):
+            ssid = network.ssid
+            if not ssid:
+                continue
+
+            if ssid not in found or network.rssi > found[ssid]["rssi"]:
+                found[ssid] = {
+                    "ssid": ssid,
+                    "rssi": network.rssi,
+                    "channel": network.channel,
+                }
+
+        wifi.radio.stop_scanning_networks()
+    except Exception as e:  # broad: radio failure modes here aren't a small fixed set
+        print(f"wifi scan failed: {e}")
+
+        return (
+            200,
+            {"Content-Type": "application/json"},
+            json.dumps({"error": str(e)}),
+        )
+
+    networks = sorted(found.values(), key=lambda n: -n["rssi"])
+
+    return (200, {"Content-Type": "application/json"}, json.dumps(networks))
 
 
 @router.route("/updates/check", method="POST")
