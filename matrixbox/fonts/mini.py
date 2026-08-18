@@ -871,12 +871,14 @@ font_mini = {
         0b000,
     ],
     "1": [
-        2,
-        0b0010,
-        0b0010,
-        0b0010,
-        0b0010,
-        0b0010,
+        # Padded to the same 4px width as every other digit — see
+        # docs/ARCHITECTURE.md.
+        4,
+        0b0100,
+        0b0100,
+        0b0100,
+        0b0100,
+        0b0100,
         0b0000,
     ],
     "2": [

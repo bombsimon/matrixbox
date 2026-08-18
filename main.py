@@ -7,7 +7,7 @@ import time
 import microcontroller
 import wifi
 
-from matrixbox import components, updater
+from matrixbox import components, stats, updater
 from matrixbox.app import session
 from matrixbox.button import LONG_PRESS, SHORT_PRESS, button
 from matrixbox.display import display
@@ -22,7 +22,7 @@ from matrixbox.web import router, url_decode
 APPS_DIR = "/apps"
 
 
-def installed_apps() -> list:
+def _installed_app_names() -> list:
     def has_code(name):
         try:
             return "code.py" in os.listdir(f"{APPS_DIR}/{name}")
@@ -34,9 +34,25 @@ def installed_apps() -> list:
     except OSError:
         names = []
 
-    apps = sorted(name for name in names if "." not in name and has_code(name))
+    return sorted(name for name in names if "." not in name and has_code(name))
 
-    return apps or ["No apps found"]
+
+def installed_apps() -> list:
+    # Used by the physical button-cycling selector, which needs a non-empty
+    # list — the app list page uses _installed_app_names() directly instead,
+    # since a literal "No apps found" would otherwise get treated as an
+    # app name — see docs/ARCHITECTURE.md.
+    return _installed_app_names() or ["No apps found"]
+
+
+def _format_size(n: int) -> str:
+    if n < 1024:
+        return str(n) + " B"
+
+    if n < 1024 * 1024:
+        return str(round(n / 1024, 1)) + " KB"
+
+    return str(round(n / (1024 * 1024), 1)) + " MB"
 
 
 @router.route("/favicon.svg")
@@ -65,17 +81,175 @@ def home(request):
 
         return (200, {}, components.page("MatrixBOX", body))
 
+    names = _installed_app_names()
+
     items = "".join(
-        f'<div class="app-item"><span class="app-name">{name}</span>'
-        f'<a class="btn btn-sm" href="/?run={name}">Run</a></div>'
-        for name in installed_apps()
+        '<div class="app-item" id="app-' + name + '" data-name="' + name + '">'
+        '<div class="app-item-main"><span class="app-name">'
+        + name
+        + '</span><span class="app-meta" id="meta-'
+        + name
+        + '"></span></div>'
+        '<div class="app-actions" id="actions-' + name + '">'
+        '<a class="btn btn-sm" href="/?run=' + name + '">Run</a>'
+        "</div></div>"
+        for name in names
     )
+    if not items:
+        items = '<p style="color:var(--muted);font-size:.85rem">No apps installed</p>'
+
+    flash_used, flash_total = stats.flash_bytes()
+    flash_line = (
+        '<p class="flash-stat" id="flashStat">'
+        + _format_size(flash_used)
+        + " used of "
+        + _format_size(flash_total)
+        + " flash</p>"
+    )
+
     body = (
         '<div class="logo"><h1>Matrix<span class="brand-yellow">BOX</span></h1>'
-        f"<p>{components.wifi_ip()}</p></div>" + components.card("Apps", items)
+        f"<p>{components.wifi_ip()}</p></div>"
+        + components.card(
+            "Apps",
+            flash_line
+            + '<div id="appList">'
+            + items
+            + "</div>"
+            + '<p class="catalog-status" id="catalogStatus"></p>',
+        )
+        + """<script>
+function fmtSize(n){
+  if(n<1024) return n+" B";
+  if(n<1024*1024) return Math.round(n/1024*10)/10+" KB";
+  return Math.round(n/1024/1024*10)/10+" MB";
+}
+function appRow(name){
+  return '<div class="app-item" id="app-'+name+'" data-name="'+name+'">'
+    +'<div class="app-item-main"><span class="app-name">'+name+'</span>'
+    +'<span class="app-meta" id="meta-'+name+'"></span></div>'
+    +'<div class="app-actions" id="actions-'+name+'"></div></div>';
+}
+function installBtn(name){
+  return '<button class="btn btn-sm btn-save" onclick="doInstall(\\''+name+'\\',this)">Install</button>';
+}
+function renderActions(entry){
+  var el=document.getElementById("actions-"+entry.name);
+  if(!el) return;
+  var h="";
+  if(entry.installed){
+    h+='<a class="btn btn-sm" href="/?run='+entry.name+'">Run</a>';
+    if(entry.has_update)
+      h+='<button class="btn btn-sm btn-save" onclick="doUpdate(\\''+entry.name+'\\',this)">Update</button>';
+    h+='<button class="btn btn-sm btn-danger" onclick="doUninstall(\\''+entry.name+'\\',this)">Uninstall</button>';
+  }else{
+    h+=installBtn(entry.name);
+  }
+  el.innerHTML=h;
+}
+function renderMeta(entry){
+  var el=document.getElementById("meta-"+entry.name);
+  if(!el) return;
+  var parts=[];
+  if(entry.installed) parts.push("v"+(entry.local_version||"?"));
+  if(entry.has_update) parts.push("&rarr; v"+entry.remote_version);
+  else if(!entry.installed && entry.remote_version) parts.push("v"+entry.remote_version+" available");
+  var size=entry.installed?entry.local_size:entry.remote_size;
+  if(size) parts.push(fmtSize(size));
+  el.innerHTML=parts.join(" &middot; ");
+}
+function loadCatalog(){
+  var status=document.getElementById("catalogStatus");
+  status.textContent="Checking upstream for apps\\u2026";
+  fetch("/apps/catalog").then(function(r){return r.json()}).then(function(data){
+    if(data.error){status.textContent="Couldn't reach upstream repo.";return;}
+    status.textContent="";
+    data.forEach(function(entry){
+      if(!document.getElementById("app-"+entry.name)){
+        document.getElementById("appList").insertAdjacentHTML("beforeend", appRow(entry.name));
+      }
+      renderMeta(entry);
+      renderActions(entry);
+    });
+  }).catch(function(){status.textContent="Couldn't reach upstream repo.";});
+}
+function doInstall(name,b){
+  b.textContent="Installing\\u2026";b.disabled=true;
+  fetch("/updates/apply?target="+encodeURIComponent(name),{method:"POST"})
+    .then(function(r){return r.json()})
+    .then(function(d){ if(d.ok) location.reload(); else {b.textContent="Failed";b.disabled=false;} })
+    .catch(function(){b.textContent="Failed";b.disabled=false;});
+}
+function doUpdate(name,b){
+  b.textContent="Updating\\u2026";b.disabled=true;
+  fetch("/updates/apply?target="+encodeURIComponent(name),{method:"POST"})
+    .then(function(r){return r.json()})
+    .then(function(d){ if(d.ok) location.reload(); else {b.textContent="Failed";b.disabled=false;} })
+    .catch(function(){b.textContent="Failed";b.disabled=false;});
+}
+function doUninstall(name,b){
+  if(!confirm("Delete "+name+" from the device? This can't be undone.")) return;
+  b.textContent="Deleting\\u2026";b.disabled=true;
+  fetch("/apps/uninstall?name="+encodeURIComponent(name),{method:"POST"})
+    .then(function(r){return r.json()})
+    .then(function(d){ if(d.ok) location.reload(); else {b.textContent="Failed";b.disabled=false;} })
+    .catch(function(){b.textContent="Failed";b.disabled=false;});
+}
+loadCatalog();
+</script>"""
     )
 
     return (200, {}, components.page("MatrixBOX", body))
+
+
+@router.route("/apps/catalog")
+def apps_catalog(request):
+    try:
+        catalog = updater.build_catalog(_installed_app_names())
+    except Exception as e:  # broad: network/GitHub API failure modes vary
+        print(f"catalog fetch failed: {e}")
+
+        return (
+            200,
+            {"Content-Type": "application/json"},
+            json.dumps({"error": str(e)}),
+        )
+
+    return (200, {"Content-Type": "application/json"}, json.dumps(catalog))
+
+
+@router.route("/apps/uninstall", method="POST")
+def uninstall_app_route(request):
+    name = request.params.get("name", "")
+    if name not in _installed_app_names():
+        return (
+            200,
+            {"Content-Type": "application/json"},
+            json.dumps({"ok": False, "error": "not installed"}),
+        )
+
+    try:
+        updater.uninstall_app(name)
+    except OSError as e:
+        return (
+            200,
+            {"Content-Type": "application/json"},
+            json.dumps({"ok": False, "error": str(e)}),
+        )
+
+    changed = False
+    if settings.get("autostart") == name:
+        settings["autostart"] = ""
+        changed = True
+
+    if settings.get("screensaver") == name:
+        settings["screensaver"] = ""
+        changed = True
+
+    if changed:
+        settings.save()
+
+    return (200, {"Content-Type": "application/json"}, json.dumps({"ok": True}))
 
 
 def _option(value, label, current):
@@ -520,6 +694,7 @@ def main():
             session.launch(screensaver_app)
 
         time.sleep(0.01)
+        stats.record_tick(0.01)
 
 
 main()

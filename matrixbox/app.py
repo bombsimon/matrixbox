@@ -7,6 +7,7 @@ import wifi
 # before matrixbox.button claims the button's GPIO pins — see docs/ARCHITECTURE.md.
 from matrixbox.display import display
 
+from matrixbox import stats
 from matrixbox.button import LONG_PRESS, SHORT_PRESS, button
 from matrixbox.fonts import MINI
 from matrixbox.layout import Align, TextGrid
@@ -119,6 +120,7 @@ class App:
                 self.on_update(time.monotonic())
 
             time.sleep(self.tick_seconds)
+            stats.record_tick(self.tick_seconds)
 
         self.on_stop()
 

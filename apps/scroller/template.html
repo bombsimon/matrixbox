@@ -1,0 +1,107 @@
+<div class="card">
+<div class="section-title">Text</div>
+<div style="display:flex;gap:8px">
+<textarea id="text" rows="3" placeholder="Enter message… (line breaks add gaps)" style="flex:1;resize:vertical"></textarea>
+<button class="btn btn-sm" onclick="send()">&#9654; Send</button>
+</div>
+</div>
+
+<div class="card">
+<div class="section-title">Scroll Mode</div>
+<div class="seg" id="mode-seg">
+<button id="mode_h" class="on" onclick="pm('h')">&#8596; Horizontal</button>
+<button id="mode_v" onclick="pm('v')">&#8597; Vertical</button>
+<button id="mode_s" onclick="pm('s')">&#9632; Static</button>
+</div>
+<div class="seg" id="align-seg" style="display:none;margin-top:6px">
+<button id="al_left" onclick="pa('left')">&#9664; Left</button>
+<button id="al_center" class="on" onclick="pa('center')">Center</button>
+<button id="al_right" onclick="pa('right')">Right &#9654;</button>
+</div>
+<div class="seg" id="font-size-seg" style="margin-top:6px">
+<button id="sz_mini" onclick="pf('mini')">Mini</button>
+<button id="sz_small" onclick="pf('small')">Small</button>
+<button id="sz_large" class="on" onclick="pf('large')">Large</button>
+</div>
+<div class="seg" id="dir-seg" style="margin-top:6px">
+<button id="dir_rtl" class="on" onclick="pr(1)">&#8592; Right to Left</button>
+<button id="dir_ltr" onclick="pr(0)">Left to Right &#8594;</button>
+</div>
+</div>
+
+<div class="card">
+<div class="section-title">Text Color</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+<input type="color" id="colorpick" value="#ffffff" onchange="pc(this.value)" style="width:32px;height:32px;padding:2px;border:1.5px solid var(--border);border-radius:8px;background:var(--surface2);cursor:pointer">
+<div class="col-swatch" style="background:#4488ff" onclick="pc('#4488ff')"></div>
+<div class="col-swatch" style="background:#ff4444" onclick="pc('#ff4444')"></div>
+<div class="col-swatch" style="background:#ffff44" onclick="pc('#ffff44')"></div>
+<div class="col-swatch" style="background:#ff8800" onclick="pc('#ff8800')"></div>
+<div class="col-swatch" style="background:#44ff44" onclick="pc('#44ff44')"></div>
+</div>
+</div>
+
+<div class="card">
+<div class="section-title">Shadow Color</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<div class="col-swatch" style="background:#000;border-color:rgba(255,255,255,.2)" onclick="psc('black')"></div>
+<div class="col-swatch" style="background:#ffff44" onclick="psc('yellow')"></div>
+<div class="col-swatch" style="background:#fff" onclick="psc('brightwhite')"></div>
+<div class="col-swatch" style="background:#4488ff" onclick="psc('blue')"></div>
+<div class="col-swatch" style="background:#ff4444" onclick="psc('red')"></div>
+<div class="col-swatch" style="background:#ddd" onclick="psc('white')"></div>
+<div class="col-swatch" style="background:#add8e6" onclick="psc('light_blue')"></div>
+<div class="col-swatch" style="background:#44ff44" onclick="psc('green')"></div>
+<div class="col-swatch" style="background:#888" onclick="psc('grey')"></div>
+<div class="col-swatch" style="background:#222" onclick="psc('black2')"></div>
+<div class="col-swatch" style="background:#ffb6c1" onclick="psc('pink')"></div>
+<div class="col-swatch" style="background:#ff8800" onclick="psc('orange')"></div>
+</div>
+</div>
+
+<div class="card">
+<div class="section-title">Vertical offset</div>
+<div class="range-wrap">
+<input type="range" id="offset" min="0" max="32" step="1" oninput="document.getElementById('v_off').textContent=this.value" onchange="post('offset='+this.value)">
+<span class="range-val" id="v_off">0</span>
+</div>
+</div>
+
+<button class="btn btn-full btn-save" id="savebtn" onclick="save(this)">&#128190; Save Settings</button>
+
+<style>
+.col-swatch{width:32px;height:32px;border-radius:8px;border:2px solid rgba(255,255,255,.15);cursor:pointer}
+</style>
+
+<script>
+function post(qs){return fetch("/app-settings?"+qs,{method:"POST"})}
+function send(){var t=document.getElementById("text").value;if(t)post("text="+encodeURIComponent(t))}
+function pc(hex){document.getElementById("colorpick").value=hex;post("color_hex="+encodeURIComponent(hex))}
+function psc(name){post("shadow="+name)}
+function pf(s){post("font="+s);document.querySelectorAll("#font-size-seg button").forEach(function(b){b.classList.toggle("on",b.id==="sz_"+s)})}
+function pr(v){post("reverse="+v);document.getElementById("dir_rtl").classList.toggle("on",v===1);document.getElementById("dir_ltr").classList.toggle("on",v===0)}
+function setModeUI(m){
+  document.querySelectorAll("#mode-seg button").forEach(function(b){b.classList.toggle("on",b.id==="mode_"+m)});
+  var r=document.getElementById("dir_rtl"),l=document.getElementById("dir_ltr");
+  if(m==="v"){r.innerHTML="&#8593; Bottom to Top";l.innerHTML="Top to Bottom &#8595;"}
+  else{r.innerHTML="&#8592; Right to Left";l.innerHTML="Left to Right &#8594;"}
+  document.getElementById("align-seg").style.display=m==="s"?"":"none";
+}
+function pm(m){post("mode="+m);setModeUI(m)}
+function setAlignUI(a){document.querySelectorAll("#align-seg button").forEach(function(b){b.classList.toggle("on",b.id==="al_"+a)})}
+function pa(a){post("align="+a);setAlignUI(a)}
+function save(b){post("save=1").then(function(){b.textContent="✓ Saved"})}
+
+fetch("/app-settings").then(function(r){return r.json()}).then(function(s){
+  document.getElementById("text").value=s.text||"";
+  document.getElementById("colorpick").value=s.color_hex||"#ffffff";
+  document.getElementById("offset").value=s.offset||0;
+  document.getElementById("v_off").textContent=s.offset||0;
+  setModeUI(s.mode||"h");
+  setAlignUI(s.align||"center");
+  document.querySelectorAll("#font-size-seg button").forEach(function(b){b.classList.toggle("on",b.id==="sz_"+(s.font||"large"))});
+  var rev=s.reverse===undefined?1:parseInt(s.reverse);
+  document.getElementById("dir_rtl").classList.toggle("on",rev===1);
+  document.getElementById("dir_ltr").classList.toggle("on",rev===0);
+}).catch(function(){});
+</script>

@@ -1,0 +1,179 @@
+<style>
+#sw *{box-sizing:border-box}
+.badge{font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;padding:3px 10px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);transition:all .2s}
+.badge.running{border-color:#00ff88;background:#041a0c;color:#00ff88}
+.badge.paused{border-color:#ffaa00;background:#1a1200;color:#ffaa00}
+.badge.finished{border-color:#ff4444;background:#1a0404;color:#ff4444}
+.sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.preview{position:relative;margin-bottom:14px;background:#000;border:1px solid var(--border);border-radius:var(--r);min-height:110px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 16px;overflow:hidden}
+.digits{font-family:"Courier New",Courier,monospace;font-size:3rem;font-weight:700;letter-spacing:.05em;line-height:1;user-select:none;transition:opacity .1s}
+.st-paused{opacity:.4}
+.st-stopped{opacity:.65}
+.prog-wrap{position:absolute;bottom:0;left:0;right:0;height:5px;background:#141414}
+.prog-bar{height:100%;background:#00ff88;transition:width .12s linear}
+.ctrls{display:flex;gap:8px;margin-bottom:4px}
+.ctrls .btn{flex:1}
+.preset-wrap{display:flex;gap:8px}
+.preset-wrap input{flex:1}
+.col-row{display:flex;align-items:center;gap:8px}
+.col-row input[type=color]{width:32px;height:32px;padding:2px;border:1.5px solid var(--border);border-radius:8px;background:var(--surface2);cursor:pointer;flex-shrink:0}
+.col-lbl{font-family:"Courier New",monospace;font-size:.75rem;color:var(--muted)}
+</style>
+
+<div id="sw">
+<div class="card">
+<div class="sh"><div class="section-title" style="margin:0;padding:0;border:0">Stopwatch</div><span class="badge" id="badge">&mdash;</span></div>
+<div class="preview">
+<div class="digits st-stopped" id="digits" style="color:#00ff88">00:00.0</div>
+<div class="prog-wrap" id="prog-wrap" style="display:none"><div class="prog-bar" id="prog-bar"></div></div>
+</div>
+<div class="ctrls">
+<button class="btn btn-save" id="btn-main" onclick="btnMain()">&#9654; Start</button>
+<button class="btn btn-danger" onclick="doAction('reset')">&#8635; Reset</button>
+</div>
+</div>
+
+<div class="card">
+<div class="section-title">Mode</div>
+<div class="seg" id="seg-mode">
+<button id="m_stopwatch" onclick="setMode('stopwatch')">Stopwatch</button>
+<button id="m_countdown" onclick="setMode('countdown')">Countdown</button>
+</div>
+<div id="preset-wrap" style="display:none;margin-top:10px">
+<label>Countdown time</label>
+<div class="preset-wrap">
+<input type="text" id="preset-val" placeholder="MM:SS or H:MM:SS">
+<button class="btn btn-sm" onclick="setPreset()">Set</button>
+</div>
+</div>
+</div>
+
+<div class="card">
+<div class="section-title">Display</div>
+<div class="switch-row"><span>Show tenths</span><label class="switch"><input type="checkbox" id="show_tenths" onchange="onTog(this)"><span class="slider"></span></label></div>
+<label>Scale</label>
+<div class="seg" id="seg-scale">
+<button id="sc_1" onclick="setScale(1)">1&#215;</button>
+<button id="sc_2" onclick="setScale(2)">2&#215;</button>
+<button id="sc_3" onclick="setScale(3)">3&#215;</button>
+<button id="sc_4" onclick="setScale(4)">4&#215;</button>
+</div>
+</div>
+
+<div class="card">
+<div class="section-title">Colors</div>
+<div class="col-row" style="margin-bottom:10px"><input type="color" id="fg_hex" oninput="onColor(this)"><span>Digits</span><b class="col-lbl" id="fg-lbl"></b></div>
+<div class="col-row" style="margin-bottom:10px"><input type="color" id="bg_hex" oninput="onColor(this)"><span>Background</span><b class="col-lbl" id="bg-lbl"></b></div>
+<div class="col-row"><input type="color" id="accent_hex" oninput="onColor(this)"><span>Accent / bar</span><b class="col-lbl" id="ac-lbl"></b></div>
+</div>
+
+<button class="btn btn-full btn-save" id="savebtn" onclick="save(this)">&#128190; Save Settings</button>
+</div>
+
+<script>
+var swState="stopped",swMode="stopwatch",serverMs=0,lastPoll=0,presetMs=60000,tenths=true,fgColor="#00ff88",db;
+
+function pad(n){return n<10?"0"+n:""+n}
+function fmtMs(ms){
+  ms=Math.max(0,ms);
+  var ts=Math.floor(ms/1000),t=Math.floor((ms%1000)/100);
+  var h=Math.floor(ts/3600),m=Math.floor((ts%3600)/60),s=ts%60;
+  if(h>0) return h+":"+pad(m)+":"+pad(s);
+  return tenths?pad(m)+":"+pad(s)+"."+t:pad(m)+":"+pad(s);
+}
+function liveMs(){
+  if(swState!=="running") return serverMs;
+  var e=Date.now()-lastPoll;
+  return swMode==="countdown"?Math.max(0,serverMs-e):serverMs+e;
+}
+
+function tick(){
+  var ms=liveMs();
+  document.getElementById("digits").textContent=fmtMs(ms);
+  if(swMode==="countdown"&&presetMs>0)
+    document.getElementById("prog-bar").style.width=Math.max(0,Math.min(100,ms/presetMs*100))+"%";
+  requestAnimationFrame(tick);
+}
+
+function poll(){
+  fetch("/state").then(function(r){return r.json()}).then(function(d){
+    swState=d.state; serverMs=d.ms; lastPoll=Date.now();
+    swMode=d.mode; presetMs=d.preset_ms||presetMs;
+    applyState();
+  }).catch(function(){
+    document.getElementById("badge").textContent="Offline";
+    document.getElementById("badge").className="badge";
+  });
+  setTimeout(poll,300);
+}
+
+function applyState(){
+  var btn=document.getElementById("btn-main");
+  var dg=document.getElementById("digits");
+  dg.className="digits"+(swState==="paused"?" st-paused":swState==="stopped"?" st-stopped":"");
+  dg.style.color=swState==="finished"?"#ff4444":fgColor;
+  document.getElementById("prog-wrap").style.display=swMode==="countdown"?"block":"none";
+  var badge=document.getElementById("badge");
+  if(swState==="running"){badge.className="badge running";badge.textContent="Running";btn.innerHTML="⏸ Pause"}
+  else if(swState==="paused"){badge.className="badge paused";badge.textContent="Paused";btn.innerHTML="▶ Resume"}
+  else if(swState==="finished"){badge.className="badge finished";badge.textContent="Done!";btn.innerHTML="↻ Reset"}
+  else{badge.className="badge";badge.textContent="Ready";btn.innerHTML="▶ Start"}
+}
+
+function post(path,qs){
+  return fetch(path+"?"+qs,{method:"POST"});
+}
+function doAction(a){post("/action","action="+a)}
+function btnMain(){
+  if(swState==="running")       doAction("pause");
+  else if(swState==="finished") doAction("reset");
+  else                          doAction("start");
+}
+function setMode(m){
+  swMode=m; post("/app-settings","mode="+m);
+  document.querySelectorAll("#seg-mode button").forEach(function(b){b.classList.remove("on")});
+  document.getElementById("m_"+m).classList.add("on");
+  document.getElementById("preset-wrap").style.display=m==="countdown"?"block":"none";
+  document.getElementById("prog-wrap").style.display=m==="countdown"?"block":"none";
+}
+function setPreset(){var v=document.getElementById("preset-val").value.trim();if(v)post("/preset","v="+encodeURIComponent(v))}
+function setScale(v){setOn("seg-scale","sc_"+v);post("/app-settings","scale="+v)}
+function setOn(g,id){
+  document.querySelectorAll("#"+g+" button").forEach(function(b){b.classList.remove("on")});
+  var el=document.getElementById(id);if(el)el.classList.add("on");
+}
+function onTog(el){tenths=el.checked;post("/app-settings",el.id+"="+(el.checked?1:0))}
+function onColor(el){
+  var m={fg_hex:"fg-lbl",bg_hex:"bg-lbl",accent_hex:"ac-lbl"};
+  var lbl=document.getElementById(m[el.id]);if(lbl)lbl.textContent=el.value;
+  if(el.id==="fg_hex"){fgColor=el.value;if(swState!=="finished")document.getElementById("digits").style.color=fgColor}
+  if(el.id==="accent_hex"){document.getElementById("prog-bar").style.background=el.value}
+  clearTimeout(db);
+  db=setTimeout(function(){post("/app-settings",el.id+"="+encodeURIComponent(el.value))},150);
+}
+function save(b){post("/app-settings","save=1").then(function(){b.textContent="✓ Saved"})}
+
+fetch("/app-settings").then(function(r){return r.json()}).then(function(s){
+  tenths=s.show_tenths==1;
+  document.getElementById("show_tenths").checked=tenths;
+  presetMs=s.preset_ms||60000;
+  var ps=Math.floor(presetMs/1000);
+  document.getElementById("preset-val").value=pad(Math.floor(ps/60))+":"+pad(ps%60);
+  var def={fg_hex:"#00ff88",bg_hex:"#000000",accent_hex:"#ff4400"};
+  var lm={fg_hex:"fg-lbl",bg_hex:"bg-lbl",accent_hex:"ac-lbl"};
+  for(var k in lm){
+    var el=document.getElementById(k);
+    if(!el) continue;
+    el.value=s[k]||def[k];
+    var lb=document.getElementById(lm[k]);if(lb)lb.textContent=el.value;
+  }
+  fgColor=s.fg_hex||"#00ff88";
+  document.getElementById("digits").style.color=fgColor;
+  document.getElementById("prog-bar").style.background=s.accent_hex||"#ff4400";
+  setOn("seg-scale","sc_"+(s.scale||2));
+  setMode(s.mode||"stopwatch");
+}).catch(function(){});
+
+poll();
+tick();
+</script>

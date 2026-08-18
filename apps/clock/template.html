@@ -1,0 +1,123 @@
+<div class="card">
+<div class="section-title">Mode</div>
+<div class="seg" id="mode-seg">
+<button id="mode_digital" class="on" onclick="pm('digital')">Digital</button>
+<button id="mode_analog" onclick="pm('analog')">Analog</button>
+<button id="mode_analog_rect" onclick="pm('analog_rect')">Analog (rect)</button>
+</div>
+</div>
+
+<div class="card">
+<div class="section-title">Time</div>
+<div class="seg" id="fmt-seg">
+<button id="fmt_24" class="on" onclick="ph(0)">24h</button>
+<button id="fmt_12" onclick="ph(1)">12h</button>
+</div>
+<div class="switch-row"><span>Show seconds</span><label class="switch"><input type="checkbox" id="show_seconds" onchange="onTog(this)"><span class="slider"></span></label></div>
+<div class="switch-row"><span>Blink colon</span><label class="switch"><input type="checkbox" id="blink_colon" onchange="onTog(this)"><span class="slider"></span></label></div>
+</div>
+
+<div class="card">
+<div class="section-title">Info</div>
+<div class="switch-row"><span>Show date</span><label class="switch"><input type="checkbox" id="show_date" onchange="onTog(this)"><span class="slider"></span></label></div>
+<div class="switch-row"><span>Show day</span><label class="switch"><input type="checkbox" id="show_day" onchange="onTog(this)"><span class="slider"></span></label></div>
+<div class="switch-row"><span>Show temperature</span><label class="switch"><input type="checkbox" id="show_temp" onchange="onTog(this)"><span class="slider"></span></label></div>
+<label>City</label>
+<input type="text" id="city" placeholder="e.g. London" onchange="post('city='+encodeURIComponent(this.value))">
+</div>
+
+<div class="card" id="digital-card">
+<div class="section-title">Digital display</div>
+<label>Font</label>
+<select id="font" onchange="post('font='+this.value)">
+<option value="mini">Mini</option>
+<option value="small">Small</option>
+<option value="large">Large</option>
+</select>
+<label style="margin-top:10px">Scale</label>
+<div class="seg" id="seg-scale">
+<button id="sc_1" onclick="setScale(1)">1&#215;</button>
+<button id="sc_2" onclick="setScale(2)">2&#215;</button>
+<button id="sc_3" onclick="setScale(3)">3&#215;</button>
+<button id="sc_4" onclick="setScale(4)">4&#215;</button>
+</div>
+<div class="switch-row" style="margin-top:10px"><span>Rainbow cycle</span><label class="switch"><input type="checkbox" id="rainbow" onchange="onTog(this)"><span class="slider"></span></label></div>
+</div>
+
+<div class="card" id="analog-card">
+<div class="section-title">Analog display</div>
+<div class="switch-row"><span>Show border</span><label class="switch"><input type="checkbox" id="show_border" onchange="onTog(this)"><span class="slider"></span></label></div>
+<div class="switch-row"><span>Show hour marks</span><label class="switch"><input type="checkbox" id="show_dots" onchange="onTog(this)"><span class="slider"></span></label></div>
+</div>
+
+<div class="card">
+<div class="section-title">Accent</div>
+<div class="switch-row"><span>Show accent line</span><label class="switch"><input type="checkbox" id="accent" onchange="onTog(this)"><span class="slider"></span></label></div>
+<div class="switch-row"><span>Show shadow</span><label class="switch"><input type="checkbox" id="show_shadow" onchange="onTog(this)"><span class="slider"></span></label></div>
+</div>
+
+<div class="card">
+<div class="section-title">Colors</div>
+<div class="col-row" style="margin-bottom:10px"><input type="color" id="f_hex" oninput="onColor(this)"><span>Foreground</span><b class="col-lbl" id="f_hex-lbl"></b></div>
+<div class="col-row" style="margin-bottom:10px"><input type="color" id="b_hex" oninput="onColor(this)"><span>Background</span><b class="col-lbl" id="b_hex-lbl"></b></div>
+<div class="col-row" style="margin-bottom:10px"><input type="color" id="accent_hex" oninput="onColor(this)"><span>Accent</span><b class="col-lbl" id="accent_hex-lbl"></b></div>
+<div class="col-row" style="margin-bottom:10px"><input type="color" id="hour_hex" oninput="onColor(this)"><span>Hour hand</span><b class="col-lbl" id="hour_hex-lbl"></b></div>
+<div class="col-row" style="margin-bottom:10px"><input type="color" id="min_hex" oninput="onColor(this)"><span>Minute hand</span><b class="col-lbl" id="min_hex-lbl"></b></div>
+<div class="col-row" style="margin-bottom:10px"><input type="color" id="sec_hex" oninput="onColor(this)"><span>Second hand</span><b class="col-lbl" id="sec_hex-lbl"></b></div>
+<div class="col-row"><input type="color" id="dots_hex" oninput="onColor(this)"><span>Hour marks</span><b class="col-lbl" id="dots_hex-lbl"></b></div>
+</div>
+
+<button class="btn btn-full btn-save" id="savebtn" onclick="save(this)">&#128190; Save Settings</button>
+
+<style>
+.col-row{display:flex;align-items:center;gap:8px}
+.col-row input[type=color]{width:32px;height:32px;padding:2px;border:1.5px solid var(--border);border-radius:8px;background:var(--surface2);cursor:pointer;flex-shrink:0}
+.col-lbl{font-family:"Courier New",monospace;font-size:.75rem;color:var(--muted)}
+</style>
+
+<script>
+var db;
+function post(qs){return fetch("/app-settings?"+qs,{method:"POST"})}
+function onTog(el){post(el.id+"="+(el.checked?1:0))}
+function ph(v){post("h12="+v);document.getElementById("fmt_24").classList.toggle("on",v===0);document.getElementById("fmt_12").classList.toggle("on",v===1)}
+function setOn(g,id){
+  document.querySelectorAll("#"+g+" button").forEach(function(b){b.classList.remove("on")});
+  var el=document.getElementById(id);if(el)el.classList.add("on");
+}
+function setScale(v){setOn("seg-scale","sc_"+v);post("scale="+v)}
+function onColor(el){
+  var lbl=document.getElementById(el.id+"-lbl");if(lbl)lbl.textContent=el.value;
+  clearTimeout(db);
+  db=setTimeout(function(){post(el.id+"="+encodeURIComponent(el.value))},150);
+}
+function setModeUI(m){
+  document.querySelectorAll("#mode-seg button").forEach(function(b){b.classList.toggle("on",b.id==="mode_"+m)});
+  document.getElementById("digital-card").style.display=m==="digital"?"":"none";
+  document.getElementById("analog-card").style.display=m==="digital"?"none":"";
+}
+function pm(m){post("mode="+m);setModeUI(m)}
+function save(b){post("save=1").then(function(){b.textContent="✓ Saved"})}
+
+fetch("/app-settings").then(function(r){return r.json()}).then(function(s){
+  document.getElementById("city").value=s.city||"";
+  document.getElementById("font").value=s.font||"large";
+
+  var colorIds=["f_hex","b_hex","accent_hex","hour_hex","min_hex","sec_hex","dots_hex"];
+  var def={f_hex:"#ffffff",b_hex:"#000000",accent_hex:"#4488ff",hour_hex:"#ffffff",min_hex:"#4488ff",sec_hex:"#ff4444",dots_hex:"#ffffff"};
+  colorIds.forEach(function(id){
+    var el=document.getElementById(id);
+    el.value=s[id]||def[id];
+    document.getElementById(id+"-lbl").textContent=el.value;
+  });
+
+  var boolIds=["show_seconds","blink_colon","show_date","show_day","show_temp","show_border","show_dots","rainbow","accent","show_shadow"];
+  boolIds.forEach(function(id){document.getElementById(id).checked=!!parseInt(s[id]||0)});
+
+  var h12=parseInt(s.h12||0);
+  document.getElementById("fmt_24").classList.toggle("on",h12===0);
+  document.getElementById("fmt_12").classList.toggle("on",h12===1);
+
+  setOn("seg-scale","sc_"+(s.scale||1));
+  setModeUI(s.mode||"digital");
+}).catch(function(){});
+</script>

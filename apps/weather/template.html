@@ -1,0 +1,121 @@
+<div class="card">
+<div class="section-title">Current Weather</div>
+<div style="text-align:center;padding:14px 0">
+<div id="wt" style="font-size:2.4rem;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">--</div>
+<div id="wc" style="font-size:.95rem;color:var(--muted);margin-top:8px">Loading...</div>
+<div id="wl" style="font-size:.75rem;color:var(--muted);margin-top:4px;opacity:.65"></div>
+</div>
+<div id="msg" style="font-size:.82rem;color:#ff7070;text-align:center;min-height:18px"></div>
+<button class="btn btn-full btn-ghost" onclick="rf()">&#8635; Refresh Now</button>
+</div>
+
+<div class="card">
+<div class="section-title">Location</div>
+<label>City name</label>
+<div style="display:flex;gap:8px">
+<input type="text" id="city" placeholder="e.g. Stockholm">
+<button class="btn btn-sm" onclick="sc()">Set</button>
+</div>
+</div>
+
+<div class="card">
+<div class="section-title">Temperature Unit</div>
+<div class="seg" id="unit-seg">
+<button id="u_C" class="on" onclick="su('C')">&#176;C Celsius</button>
+<button id="u_F" onclick="su('F')">&#176;F Fahrenheit</button>
+</div>
+</div>
+
+<div class="card">
+<div class="section-title">Clock</div>
+<div class="switch-row"><span>Show clock</span><label class="switch"><input type="checkbox" id="clock" onchange="stk(this.checked)"><span class="slider"></span></label></div>
+<div class="seg" id="fmt-seg" style="margin-top:6px">
+<button id="cm_24" class="on" onclick="scm('24')">24h</button>
+<button id="cm_12" onclick="scm('12')">12h AM/PM</button>
+</div>
+</div>
+
+<div class="card">
+<div class="section-title">Auto-refresh Interval</div>
+<div class="seg" id="int-seg">
+<button id="iv_60" onclick="si(60)">1 min</button>
+<button id="iv_300" class="on" onclick="si(300)">5 min</button>
+<button id="iv_600" onclick="si(600)">10 min</button>
+</div>
+</div>
+
+<button class="btn btn-full btn-save" id="savebtn" onclick="save(this)">&#128190; Save Settings</button>
+
+<div class="card" style="margin-top:10px">
+<div class="section-title">Scene Debug</div>
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
+<button class="btn btn-ghost btn-sm" onclick="dm('beach')">Beach</button>
+<button class="btn btn-ghost btn-sm" onclick="dm('winter')">Winter</button>
+<button class="btn btn-ghost btn-sm" onclick="dm('clear_day')">Clear Day</button>
+<button class="btn btn-ghost btn-sm" onclick="dm('clear_night')">Clear Night</button>
+<button class="btn btn-ghost btn-sm" onclick="dm('partly_cloudy')">Partly Cloudy</button>
+<button class="btn btn-ghost btn-sm" onclick="dm('cloudy')">Cloudy</button>
+<button class="btn btn-ghost btn-sm" onclick="dm('rain')">Rain</button>
+<button class="btn btn-ghost btn-sm" onclick="dm('drizzle')">Drizzle</button>
+<button class="btn btn-ghost btn-sm" onclick="dm('storm')">Storm</button>
+<button class="btn btn-ghost btn-sm" onclick="dm('fog')">Fog</button>
+<button class="btn btn-ghost btn-sm" onclick="dm('snow')">Snow</button>
+</div>
+<div id="ds" style="font-size:.85rem;color:var(--muted);margin-top:10px;text-align:center"></div>
+</div>
+
+<script>
+function post(qs){return fetch("/app-settings?"+qs,{method:"POST"})}
+function sc(){
+  var c=document.getElementById("city").value.trim();
+  if(!c) return;
+  fetch("/set-city?city="+encodeURIComponent(c),{method:"POST"})
+    .then(function(r){return r.json()})
+    .then(function(j){
+      var m=document.getElementById("msg");
+      if(j.error){m.textContent=j.error}
+      else{m.textContent="";clearDebug();lw()}
+    })
+    .catch(function(){});
+}
+function su(u){post("unit="+u);setOn("unit-seg","u_"+u)}
+function stk(checked){post("clock="+(checked?1:0))}
+function scm(m){post("clockmode="+m);setOn("fmt-seg","cm_"+m)}
+function si(n){post("interval="+n);setOn("int-seg","iv_"+n)}
+function setOn(g,id){
+  document.querySelectorAll("#"+g+" button").forEach(function(b){b.classList.remove("on")});
+  var el=document.getElementById(id);if(el)el.classList.add("on");
+}
+function save(b){post("save=1").then(function(){b.textContent="✓ Saved"})}
+function rf(){fetch("/refresh",{method:"POST"}).then(function(){clearDebug();lw()})}
+function clearDebug(){document.getElementById("ds").textContent=""}
+function dm(m){
+  fetch("/debug?mode="+m,{method:"POST"}).then(function(r){return r.json()}).then(function(j){
+    document.getElementById("ds").textContent="Active: "+j.mode+" — Set a city or Refresh to return to live data";
+  }).catch(function(){});
+}
+function lw(){
+  fetch("/weather-data").then(function(r){return r.json()}).then(function(d){
+    var t=document.getElementById("wt");
+    if(d.temp!==null&&d.temp!==undefined){
+      var u=d.unit==="F"?"°F":"°C";
+      t.textContent=d.temp.toFixed(1)+u;
+    }else{
+      t.textContent="--";
+    }
+    document.getElementById("wc").textContent=d.desc||"--";
+    document.getElementById("wl").textContent=d.city||"";
+  }).catch(function(){});
+}
+
+fetch("/app-settings").then(function(r){return r.json()}).then(function(s){
+  document.getElementById("city").value=s.city||"";
+  setOn("unit-seg","u_"+(s.unit||"C"));
+  document.getElementById("clock").checked=!!parseInt(s.clock||0);
+  setOn("fmt-seg","cm_"+(s.clockmode||"24"));
+  setOn("int-seg","iv_"+(s.interval||300));
+}).catch(function(){});
+
+lw();
+setInterval(lw,20000);
+</script>

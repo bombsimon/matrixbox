@@ -5,6 +5,7 @@ from matrixbox.settings import settings
 
 HEADERS = {"User-Agent": "MatrixBox"}
 BINARY_EXTENSIONS = ("mpy", "gif", "bmp", "png", "jpg", "bin", "raw")
+_DIR_BIT = 0x4000  # os.stat()[0] mode bit — matches matrixbox/filemanager.py
 
 # Set by update_system(), read by main.py's loop — a reset from inside the
 # request handler that triggered it would kill the response before it's
@@ -15,6 +16,12 @@ reboot_pending = False
 # components.navbar() to show the update indicator, cheap because it's
 # just a dict lookup — checking is the expensive/networked part.
 available = {}
+
+# Populated as a side effect of fetch_remote_tree() — {"/" or app_name:
+# total_bytes}. GitHub's tree API already returns a blob "size" for free,
+# so this costs nothing extra over the one tree fetch every check already
+# does — see docs/ARCHITECTURE.md.
+_remote_sizes = {}
 
 
 def _raw_url(path):
@@ -84,14 +91,18 @@ def fetch_remote_tree() -> dict:
     r.close()
 
     apps = {}
+    sizes = {}
     root_files = []
+    root_size = 0
     for item in tree:
         if item["type"] != "blob":
             continue
 
+        size = item.get("size", 0)
         parts = item["path"].split("/")
         if len(parts) == 1:
             root_files.append(parts[0])
+            root_size += size
             continue
 
         if parts[0] == "apps" and len(parts) > 2:
@@ -104,14 +115,47 @@ def fetch_remote_tree() -> dict:
             continue
 
         apps.setdefault(dirname, []).append(filename)
+        sizes[dirname] = sizes.get(dirname, 0) + size
 
     system_files = root_files[:]
+    system_size = root_size
     if "matrixbox" in apps:
         system_files += ["matrixbox/" + f for f in apps.pop("matrixbox")]
+        system_size += sizes.pop("matrixbox", 0)
 
     apps["/"] = system_files
+    sizes["/"] = system_size
+
+    _remote_sizes.clear()
+    _remote_sizes.update(sizes)
 
     return apps
+
+
+def remote_size(name) -> int:
+    return _remote_sizes.get(name, 0)
+
+
+def local_size(dir_path) -> int:
+    total = 0
+    try:
+        names = os.listdir(dir_path)
+    except OSError:
+        return 0
+
+    for name in names:
+        child = dir_path.rstrip("/") + "/" + name
+        try:
+            stat = os.stat(child)
+        except OSError:
+            continue
+
+        if stat[0] & _DIR_BIT:
+            total += local_size(child)
+        else:
+            total += stat[6]
+
+    return total
 
 
 def check_app_update(name, tree=None):
@@ -229,3 +273,47 @@ def update_system():
     _download_all(files, url_for=_raw_url, dest_for=lambda p: "/" + p)
     _replace_version_marker("/", _remote_version(files))
     reboot_pending = True
+
+
+def _remove_recursive(path):
+    for name in os.listdir(path):
+        child = path.rstrip("/") + "/" + name
+        if os.stat(child)[0] & _DIR_BIT:
+            _remove_recursive(child)
+        else:
+            os.remove(child)
+
+    os.rmdir(path)
+
+
+def uninstall_app(name):
+    _remove_recursive("/apps/" + name)
+
+
+def build_catalog(installed_apps) -> list:
+    # One tree fetch covers every app, installed or not yet — apps that
+    # exist upstream but were never installed show up here too, so the
+    # app list can offer them as installable — see docs/ARCHITECTURE.md.
+    tree = fetch_remote_tree()
+    names = set(installed_apps) | {name for name in tree if name != "/"}
+
+    catalog = []
+    for name in sorted(names):
+        is_installed = name in installed_apps
+        remote_files = tree.get(name)
+        remote_ver = _remote_version(remote_files) if remote_files else None
+        local_ver = local_version("/apps/" + name) if is_installed else None
+
+        catalog.append(
+            {
+                "name": name,
+                "installed": is_installed,
+                "local_version": local_ver,
+                "remote_version": remote_ver,
+                "has_update": is_installed and is_newer(remote_ver, local_ver),
+                "local_size": local_size("/apps/" + name) if is_installed else 0,
+                "remote_size": remote_size(name),
+            }
+        )
+
+    return catalog

@@ -460,6 +460,47 @@ script in Node rather than re-reading it — reasoning about escape
 layering in the abstract is exactly how the wrong fix got shipped the
 first time.
 
+## Porting apps from the old codebase — lessons from apps/paint
+
+`str.isalnum()` is not implemented on this CircuitPython build —
+confirmed via `/console` (`'a'.isalnum()` raises `AttributeError`). The
+old code relied on it for sanitizing user-supplied save-file names; the
+port checks membership in an explicit allowed-character string instead.
+This bit *specifically* because the bug only showed up inside the real
+route handler, never in an isolated `/console` script used to narrow it
+down — the script had the save name hardcoded and never exercised the
+sanitizer at all, so several rounds of "reproduce it standalone" kept
+succeeding while the real thing kept failing for what looked like the
+same code. Lesson: an isolated repro needs to exercise the *exact* same
+call path, not a hand-simplified version of it — a diagonal shortcut
+here is exactly where a diverging assumption hides.
+
+A naive one-pixel-at-a-time flood fill (Python-level BFS, one native
+pixel call per pixel) measured well over two minutes for a few thousand
+pixels on real hardware — the old codebase had the same algorithm, so
+this wasn't a regression, but it's bad enough to be worth fixing on
+sight once measured. A scanline fill (`fill_rect()` for whole
+contiguous runs, one queued seed point per run instead of per pixel)
+brought the same operation to under 2 seconds.
+
+Building a whole-canvas data structure (and its full JSON serialization)
+in memory inside a request handler is a real crash risk here, even when
+an equivalent top-level script handles the same data size fine — the
+handler runs several stack frames deeper (inside `App.run()` →
+`router.listen()` → the route closure), leaving less contiguous memory
+available than a fresh script gets. Writing large saved state row by
+row, streaming straight to the open file, avoids ever holding the whole
+structure (or its serialized form) at once.
+
+Syncing files to the device over USB is not synchronous — macOS buffers
+mass-storage writes, and resetting the device immediately after
+`tools/sync.sh` finishes can catch a write mid-flush and truncate a file
+on the device (confirmed on real hardware: a font data file cut off
+mid-statement, taking the whole kernel down with a `SyntaxError` at
+boot, since `matrixbox/fonts` is imported eagerly). `sync.sh` calls
+`sync` at the end now, but that's a floor, not a guarantee — give it a
+few seconds of slack before rebooting regardless.
+
 ## The save-settings button — one convention, two rendering paths
 
 `components.save_button()` is the only place the markup/class/icon for a
@@ -474,3 +515,76 @@ already do: the `.btn-save` CSS (`matrixbox/theme.py`) and the
 "call `save(this)`, set the button's text once the fetch resolves"
 JS pattern, which every save button — system settings, stocks, lastfm —
 follows.
+
+## Fixing the scroller app — offset and the frozen vertical mode
+
+Two real bugs found porting `apps/scroller`, both from the same root
+cause: `on_update()` only redrew the display when `Scroller.update(now)`
+returned `True` — which only happens on an actual scroll-position change.
+Content that fits the viewport with nothing to scroll (a single line in
+vertical mode, where each line's height already equals the display
+height) never triggers that, so it never got an initial draw at all —
+switching to vertical mode with short text just froze whatever was on
+screen before. Static mode was also silently ignoring the offset
+setting entirely — it had its own draw path that never read it.
+
+Fixed by drawing every mode's content into a display-sized scratch
+canvas (`self.viewport`) via a single `_draw_frame()` that always runs
+once after every rebuild, then compositing that onto the real display
+canvas with an explicitly clamped, explicitly clipped offset — not
+relying on `bitmaptools.blit()`'s own dest-bounds clipping behavior for
+correctness. `on_settings_saved()` now also calls `_draw_frame()`
+directly when only `offset` changes, since that doesn't need a full
+`_rebuild()`.
+
+## The `/app-settings` POST body gotcha, twice
+
+`Request.params` only ever comes from the URL query string —
+`matrixbox/web.py`'s `Request._parse_params()` never looks at the POST
+body. Every route in this codebase that takes POST data expects
+`?key=val` in the URL, body-only POSTs silently produce empty params.
+This bit weather's `/set-city` handler (JS sent the city as a POST body)
+and, separately, one of my own live `/console` test scripts probing the
+scroller bug — the fix in both cases was the same: send data as a query
+string via the shared `post(qs)` JS helper pattern every other route
+already uses, not a request body.
+
+## Device stats — CPU load is an approximation, not a real metric
+
+CircuitPython has no OS-level scheduler to ask "what's the load" — the
+kernel and every app are each a single cooperative while-loop with a
+fixed `time.sleep()` at the end. `matrixbox/stats.py`'s `record_tick()`
+approximates load as an EWMA of "how much of each loop iteration wasn't
+the known sleep call" — called once per iteration, right after that
+iteration's `time.sleep()`, from both `main()`'s loop and `App.run()`'s
+(never both at once, since only one loop is ever active). It's a rough
+duty-cycle signal, not a real per-process CPU percentage — good enough
+for "is something stuck/busy" at a glance in the navbar, nothing more.
+Memory and flash stats (`mem_bytes()`, `flash_bytes()`) are exact,
+straight from `gc.mem_free()`/`mem_alloc()` and `os.statvfs("/")`.
+
+## App catalog — installed and not-yet-installed apps in one list
+
+`updater.build_catalog()` merges `_installed_app_names()` with every app
+name found in the upstream repo's `apps/` tree, so the home page's app
+list can offer *not-yet-installed* upstream apps as installable, not
+just show update badges on ones already present. Installing and
+updating are the same backend call (`updater.update_app()` via the
+existing `/updates/apply` route) — `_ensure_dir()` + `_download_all()`
+don't care whether the target directory already existed, so "install"
+needed no new download path, only a UI that offers it when
+`installed=False`.
+
+Remote file sizes come free from GitHub's tree API (`item["size"]` on
+every blob) — `fetch_remote_tree()` captures per-app totals into a
+module-level `_remote_sizes` dict as a side effect, read via
+`remote_size()`, rather than costing a second tree fetch or changing
+that function's existing return shape (several other functions already
+depend on it being `{name: [file_paths]}`).
+
+Uninstalling is a plain recursive directory delete
+(`updater.uninstall_app()`), guarded by requiring the name to already be
+in `_installed_app_names()` before touching the filesystem — that also
+doubles as the path-traversal guard, since a crafted name can't match a
+real installed directory. Not yet exercised on real hardware by choice —
+delete is delete.

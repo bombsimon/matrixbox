@@ -1,0 +1,47 @@
+<div class="card">
+<div class="section-title">Effect</div>
+<select id="effect" onchange="setEffect(this.value)">__OPTIONS__</select>
+</div>
+
+__FRAGMENT__
+
+<button class="btn btn-full btn-save" id="savebtn" onclick="save(this)">&#128190; Save Settings</button>
+
+<p style="color:var(--muted);font-size:.78rem;text-align:center;margin-top:12px">A short button press drops fish food while the aquarium is active.</p>
+
+<script>
+function post(qs){return fetch("/app-settings?"+qs,{method:"POST"})}
+function setEffect(v){post("effect="+v+"&save=1").then(function(){location.reload()})}
+function rangeLive(el){document.getElementById("v_"+el.id).textContent=el.value}
+function setSeg(groupId,v){
+  document.querySelectorAll("#"+groupId+" button").forEach(function(b){
+    b.classList.toggle("on",parseInt(b.dataset.v)===v);
+  });
+}
+function save(b){post("save=1").then(function(){b.textContent="✓ Saved"})}
+
+function loadRangeVals(ids){
+  fetch("/app-settings").then(function(r){return r.json()}).then(function(d){
+    ids.forEach(function(id){
+      var el=document.getElementById(id);
+      if(!el||d[id]===undefined)return;
+      el.value=d[id];
+      document.getElementById("v_"+id).textContent=d[id];
+    });
+  });
+}
+function loadChecks(ids){
+  fetch("/app-settings").then(function(r){return r.json()}).then(function(d){
+    ids.forEach(function(id){
+      var el=document.getElementById(id);
+      if(!el||d[id]===undefined)return;
+      el.checked=!!d[id];
+    });
+  });
+}
+function loadSeg(groupId,key){
+  fetch("/app-settings").then(function(r){return r.json()}).then(function(d){
+    if(d[key]!==undefined)setSeg(groupId,d[key]);
+  });
+}
+</script>
