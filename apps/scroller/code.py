@@ -29,12 +29,13 @@ class ScrollerApp(App):
     default_settings = {
         "text": "",  # replaced with this device's own IP on first run
         "mode": "h",  # h(orizontal) / v(ertical) / s(tatic)
-        "align": "center",  # static mode only
+        "align": "center",  # static and vertical modes only
         "reverse": 1,
         "font": "large",
         "color_hex": "#ffffff",
         "shadow": "black",
         "offset": 0,
+        "speed": 1,  # pixels per tick, 1-5 — see docs/ARCHITECTURE.md
     }
 
     def on_start(self):
@@ -81,6 +82,7 @@ class ScrollerApp(App):
             "reverse",
             "color_hex",
             "shadow",
+            "speed",
         )
         if any(k in values for k in rebuild_keys):
             self._rebuild()
@@ -104,16 +106,17 @@ class ScrollerApp(App):
         lines = self.config["text"].replace("\r", "").split("\n")
         mode = self.config["mode"]
         reverse = int(self.config["reverse"])
+        speed = max(1, min(int(self.config["speed"]), 5))
 
         self.scroller = None
         self.static_canvas = None
 
         if mode == "v":
-            self._rebuild_vertical(font, lines, reverse)
+            self._rebuild_vertical(font, lines, reverse, speed)
         elif mode == "s":
             self._rebuild_static(font, lines)
         else:
-            self._rebuild_horizontal(font, lines, reverse)
+            self._rebuild_horizontal(font, lines, reverse, speed)
 
         # Content that fits the viewport with no scrolling needed (a single
         # short line, a static layout) would otherwise never get an initial
@@ -143,14 +146,37 @@ class ScrollerApp(App):
 
         display.refresh()
 
-    def _rebuild_vertical(self, font, lines, reverse):
-        row_h = display.height
-        canvas = display.new_canvas(display.width, max(len(lines), 1) * row_h)
+    def _rebuild_vertical(self, font, lines, reverse, speed):
+        # A full viewport-height cell per line meant a single line's canvas
+        # was exactly viewport height — Scroller.needs_scroll stayed False
+        # forever, so short text (the common case) never moved at all, only
+        # multi-line text did — see docs/ARCHITECTURE.md. A viewport-height
+        # blank pad above and below guarantees room to scroll regardless of
+        # line count, mirroring how horizontal mode's PADDING spaces do the
+        # same on that axis, and doubles as a seamless loop point — both
+        # ends of the scroll range show nothing but blank pad, so the jump
+        # back to the start is invisible.
+        row_h = font.height + 2
+        pad = display.height
+        align = self.config["align"]
+        canvas = display.new_canvas(display.width, max(len(lines), 1) * row_h + pad * 2)
+
         for i, line in enumerate(lines):
+            if not line.strip():
+                continue
+
+            width = font.text_width(line)
+            if align == "left":
+                x = 1
+            elif align == "right":
+                x = canvas.width - width - 1
+            else:
+                x = max((canvas.width - width) // 2, 1)
+
             canvas.text(
                 line,
-                1,
-                i * row_h,
+                x,
+                pad + i * row_h,
                 font=font,
                 color=self.text_slot,
                 shadow=self.shadow_slot,
@@ -158,7 +184,7 @@ class ScrollerApp(App):
 
         direction = Direction.UP if reverse else Direction.DOWN
         self.scroller = Scroller(
-            canvas, display.width, display.height, direction=direction, speed=1
+            canvas, display.width, display.height, direction=direction, speed=speed
         )
 
     def _rebuild_static(self, font, lines):
@@ -193,7 +219,7 @@ class ScrollerApp(App):
 
         self.static_canvas = canvas
 
-    def _rebuild_horizontal(self, font, lines, reverse):
+    def _rebuild_horizontal(self, font, lines, reverse, speed):
         gap = " " * PADDING
         text = " " * PADDING + gap.join(lines) + " " * PADDING
         width = max(font.text_width(text), 1)
@@ -204,7 +230,7 @@ class ScrollerApp(App):
 
         direction = Direction.LEFT if reverse else Direction.RIGHT
         self.scroller = Scroller(
-            canvas, display.width, display.height, direction=direction, speed=1
+            canvas, display.width, display.height, direction=direction, speed=speed
         )
 
 

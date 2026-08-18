@@ -60,6 +60,14 @@
 </div>
 
 <div class="card">
+<div class="section-title">Speed</div>
+<div class="range-wrap">
+<input type="range" id="speed" min="1" max="5" step="1" oninput="document.getElementById('v_speed').textContent=this.value" onchange="post('speed='+this.value)">
+<span class="range-val" id="v_speed">1</span>
+</div>
+</div>
+
+<div class="card">
 <div class="section-title">Vertical offset</div>
 <div class="range-wrap">
 <input type="range" id="offset" min="0" max="32" step="1" oninput="document.getElementById('v_off').textContent=this.value" onchange="post('offset='+this.value)">
@@ -85,7 +93,7 @@ function setModeUI(m){
   var r=document.getElementById("dir_rtl"),l=document.getElementById("dir_ltr");
   if(m==="v"){r.innerHTML="&#8593; Bottom to Top";l.innerHTML="Top to Bottom &#8595;"}
   else{r.innerHTML="&#8592; Right to Left";l.innerHTML="Left to Right &#8594;"}
-  document.getElementById("align-seg").style.display=m==="s"?"":"none";
+  document.getElementById("align-seg").style.display=(m==="s"||m==="v")?"":"none";
 }
 function pm(m){post("mode="+m);setModeUI(m)}
 function setAlignUI(a){document.querySelectorAll("#align-seg button").forEach(function(b){b.classList.toggle("on",b.id==="al_"+a)})}
@@ -97,6 +105,8 @@ fetch("/app-settings").then(function(r){return r.json()}).then(function(s){
   document.getElementById("colorpick").value=s.color_hex||"#ffffff";
   document.getElementById("offset").value=s.offset||0;
   document.getElementById("v_off").textContent=s.offset||0;
+  document.getElementById("speed").value=s.speed||1;
+  document.getElementById("v_speed").textContent=s.speed||1;
   setModeUI(s.mode||"h");
   setAlignUI(s.align||"center");
   document.querySelectorAll("#font-size-seg button").forEach(function(b){b.classList.toggle("on",b.id==="sz_"+(s.font||"large"))});
